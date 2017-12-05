@@ -29,7 +29,7 @@ class CocoYolo():
         thres_loss = 1000
         n_epochs = 90
         common_params = {
-            'image_size': 240,
+            'image_size': 224,
             'num_classes': 20,
             'batch_size': 1
             }
