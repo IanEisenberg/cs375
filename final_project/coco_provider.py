@@ -59,6 +59,14 @@ def preprocess_for_training(image, image_min_size = 240):
 
     return image
 
+def _scale_image(image, image_height, image_width):
+    ih, iw = tf.shape(image)[0], tf.shape(image)[1]
+    image = tf.expand_dims(image, 0)
+    image = tf.image.resize_bilinear(image, [image_height, image_width], align_corners=False)
+    image = tf.squeeze(image, axis=[0])
+
+    return image, image_height / ih, image_width / iw
+
 def combine_masks(gt_masks, labels):
     def _time_label(input_elem):
         gt_mask, label = input_elem
@@ -270,10 +278,12 @@ class COCO(data.TFRecordsParallelByFileProvider):
             # single_label = labels[0]
 
             # gt_boxes = tf.reshape(bboxes, [num_instances, 4])
-            image = preprocess_for_training(image, self.image_min_size)
-            image = _central_crop(image, self.crop_height, self.crop_width)
+            #image = preprocess_for_training(image, self.image_min_size)
+            #image = _central_crop(image, self.crop_height, self.crop_width)
             # x_shift, y_shift = (iw - self.crop_width)/2, (ih - self.crop_height)/2
             # boxes = gt_boxes - [x_shift, y_shift, x_shift, y_shift]
+
+            image, h_scale, w_scale = _scale_image(image, self.crop_height, self.crop_width)
 
             # import pdb; pdb.set_trace()
             # bboxes = tf.reshape(bboxes, [num_instances, 4])
@@ -286,6 +296,12 @@ class COCO(data.TFRecordsParallelByFileProvider):
             # x_center, y_center = [(padded_boxes[:,j] + padded_boxes[:,j+2])/2 for j in (0,1)]
             # w, h = [(padded_boxes[:,j+2] - padded_boxes[:,j]) for j in (0,1)]
             # padded_boxes = tf.stack([x_center, y_center, w, h])
+            x1, y1, x2, y2 = tf.unstack(padded_boxes, axis=1)
+            x1 *= w_scale
+            x2 *= w_scale
+            y1 *= h_scale
+            y2 *= h_scale
+            padded_boxes = tf.stack([x1, y1, x2, y2], axis=1)
 
             zero_pad = tf.zeros([max_objects] - tf.shape(labels), dtype=labels.dtype)
             padded_labels = tf.reshape(tf.cast(tf.concat([labels, zero_pad], axis=0), tf.float64), [-1, 1])
