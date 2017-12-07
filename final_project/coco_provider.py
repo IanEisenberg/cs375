@@ -237,8 +237,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
             meta_dicts = meta_dicts,
             batch_size=batch_size,
             n_threads=n_threads,
-            # shuffle = True,
-            shuffle=False,
             *args, 
             **kwargs)
 
@@ -309,9 +307,9 @@ class COCO(data.TFRecordsParallelByFileProvider):
             # padded_labels = tf.cast(tf.reshape(tf.pad(labels, [[0, max_objects]]), [-1, 1]), tf.float64)
             # ones = tf.ones([tf.shape(padded_boxes)[0], 1], dtype=padded_boxes.dtype)
             padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
-            data[i] = {'images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances}#, 'multiple_labels': labels}
+            data[i] = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances}#, 'multiple_labels': labels}
             # data[i]['mask_coco'].set_shape([self.crop_height, self.crop_width, 1])
-            data[i]['images'].set_shape([self.crop_height, self.crop_width, 3])
+            data[i]['coco_images'].set_shape([self.crop_height, self.crop_width, 3])
         
             # data[i] = {
             #     'images': tf.random_normal([224, 224, 3]),
