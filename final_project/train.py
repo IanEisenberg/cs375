@@ -23,7 +23,7 @@ class ImageNetYOLO():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 2# 256
+        batch_size = 1 # 256
         data_path = '/datasets/TFRecord_Imagenet_standard'
         seed = 0
         crop_size = 227
@@ -32,8 +32,8 @@ class ImageNetYOLO():
         datasets = {'imagenet': 1, 'coco': 1}
         common_params = {
             'image_size': crop_size,
-            'num_classes': 80,
-            'batch_size': 2
+            'num_classes': 0,
+            'batch_size': batch_size
             }
         net_params = {
             'boxes_per_cell': 2,
@@ -118,7 +118,7 @@ class ImageNetYOLO():
                 'shuffle': False,
                 'shuffle_seed': self.Config.seed,
                 'file_grab_func': self.subselect_tfrecords,
-                'n_threads': 4 # sum(self.Config.datasets.values()),
+                'n_threads': 1# sum(self.Config.datasets.values()),
             },
             'queue_params': {
                 'queue_type': 'random',

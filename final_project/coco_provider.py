@@ -320,7 +320,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
             data[i]['ih'] = ih
             data[i]['iw'] = iw
             # data[i]['prints'] = [p1, p2]
-            
         return data
 
     def set_data_shapes_none(self, data):
