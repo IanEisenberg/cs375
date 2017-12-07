@@ -29,11 +29,11 @@ class ImageNetYOLO():
         crop_size = 227
         thres_loss = 1000
         n_epochs = 90
-        datasets = {'imagenet': 1, 'coco': 0}
+        datasets = {'imagenet': 1, 'coco': 1}
         common_params = {
             'image_size': crop_size,
-            'num_classes': 20,
-            'batch_size': 1
+            'num_classes': 80,
+            'batch_size': 2
             }
         net_params = {
             'boxes_per_cell': 2,
@@ -118,7 +118,7 @@ class ImageNetYOLO():
                 'shuffle': False,
                 'shuffle_seed': self.Config.seed,
                 'file_grab_func': self.subselect_tfrecords,
-                'n_threads': sum(self.Config.datasets.values()),
+                'n_threads': 4 # sum(self.Config.datasets.values()),
             },
             'queue_params': {
                 'queue_type': 'random',
@@ -298,7 +298,7 @@ class ImageNetYOLO():
             'dbname': 'final',
             'collname': 'yolo',
             'exp_id': 'imagenet',
-            'do_restore': False,
+            'do_restore': True,
             'load_query': None,
         }
 

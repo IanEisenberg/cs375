@@ -75,7 +75,7 @@ class Combine_world:
             imagenet_data_path = '/datasets/TFRecord_Imagenet_standard'
             
             curr_batch_size = batch_size
-
+            trans_dicts_imagenet = [{'images': 'images_labelnet'}, {'labels': 'labels_imagenet'}]
             if self.ret_list:
                 curr_data_params = {
                     'func': data.TFRecordsParallelByFileProvider,
@@ -98,6 +98,7 @@ class Combine_world:
                                                                group = group,
                                                                batch_size = batch_size,
                                                                n_thread = n_threads,
+                                                               crop_size = self.crop_size,
                                                                crop_height = self.crop_size,
                                                                crop_width = self.crop_size,
                                                                *args, **kwargs
@@ -106,11 +107,11 @@ class Combine_world:
         if cfg_dataset.get('coco', 0)==1:
             key_list = ['height', 'images', 'labels', 'num_objects', \
                     'segmentation_masks', 'width']
-            BYTES_KEYs = ['images', 'labels', 'segmentation_masks']
-
-            source_dirs = [data_path['coco_no0/%s/%s' % (self.group, v)] for v in key_list]
-
-            meta_dicts = [{v : {'dtype': tf.string, 'shape': []}} if v in BYTES_KEYs else {v : {'dtype': tf.int64, 'shape': []}} for v in key_list]
+            trans_dicts_coco = [{'images': 'images_coco'}, 
+                                    {'ih': 'ih'},
+                                    {'boxes': 'boxes'},
+                                    {'num_objects': 'num_objects'},
+                                    {'iw': 'iw'}]
             if self.ret_list:
                 curr_data_params = {
                         'func': coco_provider.COCO,
@@ -127,14 +128,12 @@ class Combine_world:
                 self.data_params_list.append(curr_data_params)
                 self.queue_params_list.append(self.queue_params)
             else:
-                self.all_providers.append(coco_provider.COCO(source_dirs = source_dirs,
-                                                             meta_dicts = meta_dicts,
-                                                             group = group,
+                self.all_providers.append(coco_provider.COCO(group = group,
                                                              batch_size = batch_size,
                                                              n_threads = n_threads,
                                                              image_min_size = 240,
-                                                             crop_height = 224,
-                                                             crop_width = 224,
+                                                             crop_height = self.crop_size,
+                                                             crop_width = self.crop_size,
                                                              *args, **kwargs
                                                             ))
 
@@ -214,4 +213,5 @@ class Combine_world:
             for curr_init_ops in all_init_ops:
                 curr_dict.update(curr_init_ops[indx_t])
             self.ret_init_ops.append(curr_dict)
+        # import pdb; pdb.set_trace()
         return self.ret_init_ops
