@@ -41,8 +41,6 @@ class YoloTinyNet(Net):
     
     outputs = inputs
     images = inputs['images']
-    images = tf.reshape(images, [1, 224, 224, 3])
-
     conv_num = 1
 
     temp_conv = tf.layers.conv2d(images, 16, (3, 3), (1, 1),  

@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
  
 import functools
+import collections
 import os, sys
 import time
 import numpy as np
@@ -237,92 +238,97 @@ class COCO(data.TFRecordsParallelByFileProvider):
             meta_dicts = meta_dicts,
             batch_size=batch_size,
             n_threads=n_threads,
-            # shuffle = True,
-            shuffle=False,
             *args, 
             **kwargs)
 
     def prep_data(self, data):
         for i in range(len(data)):
-            inputs = data[i]
+            d = data[i]
+            batch_tensors = collections.defaultdict(list)
+            for j in range(self.batch_size):
+                inputs = {k: d[k][j] for k in d}
 
-            image = inputs['images']
-            image = tf.decode_raw(image, tf.uint8)
-            ih = inputs['height']
-            iw = inputs['width']
-            ih = tf.cast(ih, tf.int32)
-            iw = tf.cast(iw, tf.int32)
-            inputs['height'] = ih
-            inputs['width'] = iw
-            
-            bboxes = tf.decode_raw(inputs['bboxes'], tf.float64)
-            
-            imsize = tf.size(image)
+                image = inputs['images']
+                image = tf.decode_raw(image, tf.uint8)
+                ih = inputs['height']
+                iw = inputs['width']
+                ih = tf.cast(ih, tf.int32)
+                iw = tf.cast(iw, tf.int32)
+                inputs['height'] = ih
+                inputs['width'] = iw
+                
+                bboxes = tf.decode_raw(inputs['bboxes'], tf.float64)
+                
+                imsize = tf.size(image)
 
-            #image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
+                #image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
 
-            image = tf.cond(tf.equal(imsize, ih * iw), \
-                  lambda: tf.image.grayscale_to_rgb(tf.reshape(image, (ih, iw, 1))), \
-                  lambda: tf.reshape(image, (ih, iw, 3)))
-            
-            image_height = ih
-            image_width = iw
-            num_instances = inputs['num_objects']
-            num_instances = tf.cast(num_instances, tf.int32)
-            inputs['num_objects'] = num_instances
-            
-            labels = tf.decode_raw(inputs['labels'], tf.int32)
-            # labels = tf.reshape(labels, [num_instances, 1])
-            #labels = tf.Print(labels, [labels], message = 'Labels')
-            # inputs['labels'] = labels
-            # single_label = labels[0]
+                image = tf.cond(tf.equal(imsize, ih * iw), \
+                      lambda: tf.image.grayscale_to_rgb(tf.reshape(image, (ih, iw, 1))), \
+                      lambda: tf.reshape(image, (ih, iw, 3)))
+                
+                image_height = ih
+                image_width = iw
+                num_instances = inputs['num_objects']
+                num_instances = tf.cast(num_instances, tf.int32)
+                inputs['num_objects'] = num_instances
+                
+                labels = tf.decode_raw(inputs['labels'], tf.int32)
+                # labels = tf.reshape(labels, [num_instances, 1])
+                #labels = tf.Print(labels, [labels], message = 'Labels')
+                # inputs['labels'] = labels
+                # single_label = labels[0]
 
-            # gt_boxes = tf.reshape(bboxes, [num_instances, 4])
-            #image = preprocess_for_training(image, self.image_min_size)
-            #image = _central_crop(image, self.crop_height, self.crop_width)
-            # x_shift, y_shift = (iw - self.crop_width)/2, (ih - self.crop_height)/2
-            # boxes = gt_boxes - [x_shift, y_shift, x_shift, y_shift]
+                # gt_boxes = tf.reshape(bboxes, [num_instances, 4])
+                #image = preprocess_for_training(image, self.image_min_size)
+                #image = _central_crop(image, self.crop_height, self.crop_width)
+                # x_shift, y_shift = (iw - self.crop_width)/2, (ih - self.crop_height)/2
+                # boxes = gt_boxes - [x_shift, y_shift, x_shift, y_shift]
 
-            image, h_scale, w_scale = _scale_image(image, self.crop_height, self.crop_width)
+                image, h_scale, w_scale = _scale_image(image, self.crop_height, self.crop_width)
 
-            # import pdb; pdb.set_trace()
-            # bboxes = tf.reshape(bboxes, [num_instances, 4])
-            # bboxes.set_shape([num_instances, 4])
-            box_vector = tf.reshape(bboxes, [-1])
-            zero_pad = tf.zeros([max_objects*4] - tf.shape(box_vector), dtype=box_vector.dtype)
-            padded_boxes = tf.concat([box_vector, zero_pad], axis=0)
-            padded_boxes = tf.reshape(padded_boxes, [-1, 4])
-            # we need to turn these into x_center, y_center, w, h
-            # x_center, y_center = [(padded_boxes[:,j] + padded_boxes[:,j+2])/2 for j in (0,1)]
-            # w, h = [(padded_boxes[:,j+2] - padded_boxes[:,j]) for j in (0,1)]
-            # padded_boxes = tf.stack([x_center, y_center, w, h])
-            x1, y1, x2, y2 = tf.unstack(padded_boxes, axis=1)
-            x1 *= w_scale
-            x2 *= w_scale
-            y1 *= h_scale
-            y2 *= h_scale
-            padded_boxes = tf.stack([x1, y1, x2, y2], axis=1)
+                # import pdb; pdb.set_trace()
+                # bboxes = tf.reshape(bboxes, [num_instances, 4])
+                # bboxes.set_shape([num_instances, 4])
+                box_vector = tf.reshape(bboxes, [-1])
+                zero_pad = tf.zeros([max_objects*4] - tf.shape(box_vector), dtype=box_vector.dtype)
+                padded_boxes = tf.concat([box_vector, zero_pad], axis=0)
+                padded_boxes = tf.reshape(padded_boxes, [-1, 4])
+                # we need to turn these into x_center, y_center, w, h
+                # x_center, y_center = [(padded_boxes[:,j] + padded_boxes[:,j+2])/2 for j in (0,1)]
+                # w, h = [(padded_boxes[:,j+2] - padded_boxes[:,j]) for j in (0,1)]
+                # padded_boxes = tf.stack([x_center, y_center, w, h])
+                x1, y1, x2, y2 = tf.unstack(padded_boxes, axis=1)
+                x1 *= w_scale
+                x2 *= w_scale
+                y1 *= h_scale
+                y2 *= h_scale
+                padded_boxes = tf.stack([x1, y1, x2, y2], axis=1)
 
-            zero_pad = tf.zeros([max_objects] - tf.shape(labels), dtype=labels.dtype)
-            padded_labels = tf.reshape(tf.cast(tf.concat([labels, zero_pad], axis=0), tf.float64), [-1, 1])
+                zero_pad = tf.zeros([max_objects] - tf.shape(labels), dtype=labels.dtype)
+                padded_labels = tf.reshape(tf.cast(tf.concat([labels, zero_pad], axis=0), tf.float64), [-1, 1])
 
-            # padded_labels = tf.cast(tf.reshape(tf.pad(labels, [[0, max_objects]]), [-1, 1]), tf.float64)
-            # ones = tf.ones([tf.shape(padded_boxes)[0], 1], dtype=padded_boxes.dtype)
-            padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
-            data[i] = {'images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances}#, 'multiple_labels': labels}
-            # data[i]['mask_coco'].set_shape([self.crop_height, self.crop_width, 1])
-            data[i]['images'].set_shape([self.crop_height, self.crop_width, 3])
-        
-            # data[i] = {
-            #     'images': tf.random_normal([224, 224, 3]),
-            #     'boxes': bboxes,
-            #     'garbage_image': image,
-            #     'num_objects': tf.constant(1, dtype=tf.int32),
-            # }
-            data[i]['ih'] = ih
-            data[i]['iw'] = iw
-            # data[i]['prints'] = [p1, p2]
-            
+                # padded_labels = tf.cast(tf.reshape(tf.pad(labels, [[0, max_objects]]), [-1, 1]), tf.float64)
+                # ones = tf.ones([tf.shape(padded_boxes)[0], 1], dtype=padded_boxes.dtype)
+                padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
+                padded_boxes_with_conf.set_shape([max_objects, 5])
+                image.set_shape([self.crop_height, self.crop_width, 3])
+                example_values = {'images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
+
+                for k, v in example_values.iteritems():
+                    batch_tensors[k].append(v)
+
+                # data[i]['mask_coco'].set_shape([self.crop_height, self.crop_width, 1])
+                # data[i] = {
+                #     'images': tf.random_normal([224, 224, 3]),
+                #     'boxes': bboxes,
+                #     'garbage_image': image,
+                #     'num_objects': tf.constant(1, dtype=tf.int32),
+                # }
+                # data[i]['prints'] = [p1, p2]
+
+            data[i] = {k: tf.stack(v) for k, v in batch_tensors.iteritems()}
+
         return data
 
     def set_data_shapes_none(self, data):
@@ -333,8 +339,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
 
     def init_ops(self):
         self.input_ops = super(COCO, self).init_ops()
-
-        self.input_ops = self.set_data_shapes_none(self.input_ops)
+        # self.input_ops = self.set_data_shapes_none(self.input_ops)
         self.input_ops = self.prep_data(self.input_ops)
 
         return self.input_ops
