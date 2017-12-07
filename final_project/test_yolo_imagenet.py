@@ -47,12 +47,16 @@ class NeuralDataExperiment():
             'class_scale':1,
             'coord_scale':1
             }
-        extraction_step = None
+        #feature_masks = {}
+	extraction_step = None
         extraction_targets = [attr[0] for attr in NeuralDataProvider.ATTRIBUTES] + target_layers
         ytn = YoloTinyNet(common_params,net_params,test=False)
         assert NeuralDataProvider.N_VAL % batch_size == 0, \
                 ('number of examples not divisible by batch size!')
         val_steps = int(NeuralDataProvider.N_VAL / batch_size)
+
+    def __init__(self):
+        self.feature_masks = {}
 
     def setup_params(self):
         params = {}
@@ -173,7 +177,8 @@ class NeuralDataExperiment():
         """
         Appends the value for each key
         """
-        if agg_res is None:
+        #self.feature_masks = {}
+	if agg_res is None:
             agg_res = {k: [] for k in res}
 
             # Generate the feature masks
