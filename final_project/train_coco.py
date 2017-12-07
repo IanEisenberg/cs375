@@ -24,7 +24,7 @@ class CocoYolo():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 1
+        batch_size = 8
         seed = 0
         thres_loss = 1000
         n_epochs = 90
@@ -58,10 +58,10 @@ class CocoYolo():
         # boxes = var_dict['boxes']
         # boxes_val = sess.run(boxes)
         # import pdb; pdb.set_trace()
-        # for i in range(100):
-        #     ih, iw, image, obj_count = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects']]) #['images', 'labels', 
-        #     print ih, iw, image.shape, obj_count
-        # import pdb; pdb.set_trace()
+        for i in range(1000):
+            ih, iw, image, obj_count, boxes = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects', 'boxes']]) #['images', 'labels', 
+            print ih, iw, image.shape, obj_count
+        import pdb; pdb.set_trace()
         train_results, p = sess.run([train_targets, var_dict['print']])
         for i, result in enumerate(train_results):
             print('Model {} has loss {}'.format(i, result['loss']))

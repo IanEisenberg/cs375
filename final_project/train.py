@@ -23,7 +23,7 @@ class ImageNetYOLO():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 5 # 256
+        batch_size = 16 # 256
         data_path = '/datasets/TFRecord_Imagenet_standard'
         seed = 0
         crop_size = 224
@@ -273,7 +273,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'imagenet',
+            'exp_id': 'combined',
             'save_valid_freq': 10000,
             'save_filters_freq': 30000,
             'cache_filters_freq': 50000,
@@ -297,8 +297,8 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'imagenet',
-            'do_restore': True,
+            'exp_id': 'combined',
+            'do_restore': False,
             'load_query': None,
         }
 
