@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tfutils import base, data, model, optimizer, utils
 from ImageNetDataProvider import ImageNetDataProvider
+from data_provider import Combine_world
 from yolo_tiny_net import YoloTinyNet
 
 class ImageNetYOLO():
@@ -22,16 +23,17 @@ class ImageNetYOLO():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 256
+        batch_size = 5 # 256
         data_path = '/datasets/TFRecord_Imagenet_standard'
         seed = 0
-        crop_size = 227
+        crop_size = 224
         thres_loss = 1000
         n_epochs = 90
+        datasets = {'imagenet': 1, 'coco': 1}
         common_params = {
             'image_size': crop_size,
-            'num_classes': 20,
-            'batch_size': 1
+            'num_classes': 1000,
+            'batch_size': batch_size
             }
         net_params = {
             'boxes_per_cell': 2,
@@ -70,6 +72,8 @@ class ImageNetYOLO():
             thres_loss: if the loss exceeds thres_loss the training will be stopped
             validate_first: run validation before starting the training
         """
+        """
+        train params for straight imagenet
         params['train_params'] = {
             'data_params': {
                 # ImageNet data provider arguments
@@ -100,6 +104,37 @@ class ImageNetYOLO():
             'thres_loss': self.Config.thres_loss,
             'validate_first': False,
         }
+        """
+        params['train_params'] = {
+            'data_params': {
+                # ImageNet data provider arguments
+                'func': Combine_world,
+                'cfg_dataset': self.Config.datasets,
+                'group': 'train',
+                'crop_size': self.Config.crop_size,
+                # TFRecords (super class) data provider arguments
+                'file_pattern': 'train*.tfrecords',
+                'batch_size':  self.Config.batch_size,
+                'shuffle': False,
+                'shuffle_seed': self.Config.seed,
+                'file_grab_func': self.subselect_tfrecords,
+                'n_threads': 1# sum(self.Config.datasets.values()),
+            },
+            'queue_params': {
+                'queue_type': 'random',
+                'batch_size': self.Config.batch_size,
+                'seed': self.Config.seed,
+                'capacity': self.Config.batch_size * 10,
+                'min_after_dequeue': self.Config.batch_size * 5,
+            },
+            'targets': {
+                'func': self.return_outputs,
+                'targets': [],
+            },
+            'num_steps': self.Config.train_steps,
+            'thres_loss': self.Config.thres_loss,
+            'validate_first': False,
+        }
 
         """
         validation_params similar to train_params defines the validation parameters.
@@ -111,13 +146,6 @@ class ImageNetYOLO():
                 batch losses
         """
         
-        """
-        Using combine worlds
-        'data_params': {
-            'func': Combine_world,
-            'cfg_dataset': {'imagenet': 0}
-            '
-        """
         params['validation_params'] = {
             'topn_val': {
                 'data_params': {
@@ -270,7 +298,7 @@ class ImageNetYOLO():
             'dbname': 'final',
             'collname': 'yolo',
             'exp_id': 'imagenet',
-            'do_restore': False,
+            'do_restore': True,
             'load_query': None,
         }
 
