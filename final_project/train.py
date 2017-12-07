@@ -23,16 +23,16 @@ class ImageNetYOLO():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 1 # 256
+        batch_size = 5 # 256
         data_path = '/datasets/TFRecord_Imagenet_standard'
         seed = 0
-        crop_size = 227
+        crop_size = 224
         thres_loss = 1000
         n_epochs = 90
         datasets = {'imagenet': 1, 'coco': 1}
         common_params = {
             'image_size': crop_size,
-            'num_classes': 0,
+            'num_classes': 1000,
             'batch_size': batch_size
             }
         net_params = {
