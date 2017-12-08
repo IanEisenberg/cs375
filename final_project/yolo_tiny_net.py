@@ -30,23 +30,22 @@ class YoloTinyNet(Net):
       self.class_scale = float(net_params['class_scale'])
       self.coord_scale = float(net_params['coord_scale'])
 
-  def inference(self, inputs, train=True, norm=True, **kwargs):
-    """Build the yolo model
-
-    Args:
-      images:  4-D tensor [batch_size, image_height, image_width, channels]
-    Returns:
-      predicts: 4-D tensor [batch_size, cell_size, cell_size, num_classes + 5 * boxes_per_cell]
+  def yolo_shared(self, images, reuse=False):
     """
-    
-    outputs = inputs
-    images = inputs['images']
+    Args:
+        images: NxWxHxC tensor
+        reuse: passed to tf.layers calls, whether or not to reuse weights
+    Returns:
+        outputs: dict of layer activations
+    """
+    # Shared portion of the ImageNet / COCO pipeline
+    outputs = {} 
     conv_num = 1
-
     temp_conv = tf.layers.conv2d(images, 16, (3, 3), (1, 1),  
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
 
@@ -55,7 +54,8 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 32, (3, 3), (1, 1),  
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
 
@@ -64,7 +64,8 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 64, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
     
@@ -73,7 +74,8 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 128, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
 
@@ -82,7 +84,8 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 256, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
 
@@ -91,7 +94,8 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 512, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1
 
@@ -100,21 +104,24 @@ class YoloTinyNet(Net):
     temp_conv = tf.layers.conv2d(temp_pool, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1     
 
     temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1 
 
     temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        padding='SAME', name='conv' + str(conv_num))
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
     outputs['conv_%s' % conv_num] = temp_conv
     conv_num += 1 
 
@@ -125,17 +132,42 @@ class YoloTinyNet(Net):
     local1 = tf.layers.dense(conv_flat, 256,
         activation=tf.nn.relu, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        name='fc1')
+        name='fc1',
+        reuse=reuse)
     outputs['fc1'] = local1
 
     local2 = tf.layers.dense(local1, 4096,
         activation=tf.nn.relu,
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
-        name='fc2')
+        name='fc2',
+        reuse=reuse)
     outputs['fc2'] = local2
 
-    # Bounding box outputs
-    local3 = tf.layers.dense(local2, self.cell_size * self.cell_size * (self.num_classes + self.boxes_per_cell * 5), name='fc3')
+    return outputs
+
+  def inference(self, inputs, train=True, norm=True, **kwargs):
+    """Build the yolo model
+
+    Args:
+      images:  4-D tensor [batch_size, image_height, image_width, channels]
+    Returns:
+      predicts: 4-D tensor [batch_size, cell_size, cell_size, num_classes + 5 * boxes_per_cell]
+    """
+    
+    outputs = inputs
+    # Get the activations for each input image, then combine the dicts
+    imagenet_input = inputs['images']
+    coco_input = inputs['coco_images']
+
+    imagenet_output = self.yolo_shared(imagenet_input)
+    coco_output = self.yolo_shared(coco_input, reuse=True)
+
+    for key in imagenet_output.keys():
+      outputs['imagenet_%s' % key] = imagenet_output[key]
+      outputs['coco_%s' % key] = coco_output[key]
+
+    # Bounding box outputs for COCO image
+    local3 = tf.layers.dense(outputs['coco_fc2'], self.cell_size * self.cell_size * (self.num_classes + self.boxes_per_cell * 5), name='fc3')
     n1 = self.cell_size * self.cell_size * self.num_classes
 
     n2 = n1 + self.cell_size * self.cell_size * self.boxes_per_cell
@@ -149,8 +181,8 @@ class YoloTinyNet(Net):
     predicts = local3
     outputs['bboxes'] = predicts
 
-    # ImageNet logit outputs
-    logits = tf.layers.dense(local2, 1000, 
+    # Logit outputs for Imagenet image
+    logits = tf.layers.dense(outputs['imagenet_fc2'], 1000, 
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         name='logits')
     outputs['logits'] = logits
