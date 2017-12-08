@@ -313,7 +313,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
                 padded_boxes_with_conf.set_shape([max_objects, 5])
                 image.set_shape([self.crop_height, self.crop_width, 3])
-                example_values = {'images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
+                example_values = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
 
                 for k, v in example_values.iteritems():
                     batch_tensors[k].append(v)
