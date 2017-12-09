@@ -213,5 +213,4 @@ class Combine_world:
             for curr_init_ops in all_init_ops:
                 curr_dict.update(curr_init_ops[indx_t])
             self.ret_init_ops.append(curr_dict)
-        #import pdb; pdb.set_trace()
         return self.ret_init_ops

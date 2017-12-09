@@ -7,7 +7,6 @@ import os
 import numpy as np
 import tensorflow as tf
 from tfutils import base, data, model, optimizer, utils
-from ImageNetDataProvider import ImageNetDataProvider
 from data_provider import Combine_world
 from yolo_tiny_net import YoloTinyNet
 
@@ -23,7 +22,7 @@ class ImageNetYOLO():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 16 # 256
+        batch_size = 6 # 256
         data_path = '/datasets/TFRecord_Imagenet_standard'
         seed = 0
         crop_size = 224
@@ -32,7 +31,7 @@ class ImageNetYOLO():
         datasets = {'imagenet': 1, 'coco': 1}
         common_params = {
             'image_size': crop_size,
-            'num_classes': 1000,
+            'num_classes': 80,
             'batch_size': batch_size
             }
         net_params = {
@@ -45,8 +44,8 @@ class ImageNetYOLO():
             'coord_scale':1
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = ImageNetDataProvider.N_TRAIN / batch_size * n_epochs
-        val_steps = np.ceil(ImageNetDataProvider.N_VAL / batch_size).astype(int)
+        train_steps = 1500
+        val_steps = 100
 
 
     def setup_params(self):
@@ -72,39 +71,7 @@ class ImageNetYOLO():
             thres_loss: if the loss exceeds thres_loss the training will be stopped
             validate_first: run validation before starting the training
         """
-        """
-        train params for straight imagenet
-        params['train_params'] = {
-            'data_params': {
-                # ImageNet data provider arguments
-                'func': ImageNetDataProvider,
-                'data_path': self.Config.data_path,
-                'group': 'train',
-                'crop_size': self.Config.crop_size,
-                # TFRecords (super class) data provider arguments
-                'file_pattern': 'train*.tfrecords',
-                'batch_size': self.Config.batch_size,
-                'shuffle': False,
-                'shuffle_seed': self.Config.seed,
-                'file_grab_func': self.subselect_tfrecords,
-                'n_threads': 4,
-            },
-            'queue_params': {
-                'queue_type': 'random',
-                'batch_size': self.Config.batch_size,
-                'seed': self.Config.seed,
-                'capacity': self.Config.batch_size * 10,
-                'min_after_dequeue': self.Config.batch_size * 5,
-            },
-            'targets': {
-                'func': self.return_outputs,
-                'targets': [],
-            },
-            'num_steps': self.Config.train_steps,
-            'thres_loss': self.Config.thres_loss,
-            'validate_first': False,
-        }
-        """
+
         params['train_params'] = {
             'data_params': {
                 # ImageNet data provider arguments
@@ -145,7 +112,7 @@ class ImageNetYOLO():
                 batches in an online manner, e.g. to calculate the RUNNING mean across
                 batch losses
         """
-        
+        """
         params['validation_params'] = {
             'topn_val': {
                 'data_params': {
@@ -177,7 +144,8 @@ class ImageNetYOLO():
                 'online_agg_func': self.online_agg_mean,
             }
         }
-
+        """
+        params['validation_params'] = {}
         """
         model_params defines the model i.e. the architecture that 
         takes the output of the data provider as input and outputs 
@@ -208,9 +176,17 @@ class ImageNetYOLO():
             logits = outputs['pred']
         """
         def loss_wrapper(inputs, outputs):
+            # coco
+            predicts = outputs['bboxes']
+            gt_boxes = tf.reshape(tf.cast(outputs['boxes'], tf.int32), [self.Config.batch_size, -1, 5])
+            num_objects = outputs['num_objects']
+            coco_loss, nonsense, p = self.Config.ytn.loss(predicts, gt_boxes, num_objects)
+            # imagenet
             labels = outputs['labels']
             logits = outputs['logits']
-            return tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits) + 0.0 * tf.reduce_sum(outputs['bboxes'])
+            imagenet_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+            print(imagenet_loss, coco_loss)
+            return imagenet_loss + coco_loss
         
         params['loss_params'] = {
             'targets': ['labels'],
@@ -242,7 +218,7 @@ class ImageNetYOLO():
         params['learning_rate_params'] = {	
             'func': tf.train.exponential_decay,
             'learning_rate': 0.0001,
-            'decay_steps': ImageNetDataProvider.N_TRAIN / self.Config.batch_size,
+            'decay_steps': 5000, # FIX LATER,
             'decay_rate': 0.95,
             'staircase': True,
         }
@@ -297,7 +273,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'imagenet',
             'do_restore': False,
             'load_query': None,
         }
