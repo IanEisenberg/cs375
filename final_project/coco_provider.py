@@ -50,7 +50,7 @@ def preprocess_for_training(image, image_min_size = 240):
     new_ih, new_iw = _smallest_size_at_least(ih, iw, image_min_size)
     image = tf.expand_dims(image, 0)
     image = tf.image.resize_bilinear(image, [new_ih, new_iw], align_corners=False)
-    image = tf.squeeze(image, axis=[0])
+    # image = tf.squeeze(image, axis=[0])
 
     # gt_masks = tf.expand_dims(gt_masks, -1)
     # gt_masks = tf.cast(gt_masks, tf.float32)
@@ -227,7 +227,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
                     'segmentation_masks', 'width', 'bboxes']
 
         # key_list = ['images']
-        source_dirs = ['/mnt/data/mscoco/train_tfrecords/{}/' .format(v) for v in key_list]
+        source_dirs = ['/mnt/data/mscoco/train_tfrecords_no0/{}/' .format(v) for v in key_list]
         
         BYTES_KEYs = ['images', 'labels', 'segmentation_masks', 'bboxes']
 
@@ -256,12 +256,11 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 iw = tf.cast(iw, tf.int32)
                 inputs['height'] = ih
                 inputs['width'] = iw
-                
                 bboxes = tf.decode_raw(inputs['bboxes'], tf.float64)
                 
                 imsize = tf.size(image)
 
-                #image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
+                image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
 
                 image = tf.cond(tf.equal(imsize, ih * iw), \
                       lambda: tf.image.grayscale_to_rgb(tf.reshape(image, (ih, iw, 1))), \
@@ -287,9 +286,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
 
                 image, h_scale, w_scale = _scale_image(image, self.crop_height, self.crop_width)
 
-                # import pdb; pdb.set_trace()
-                # bboxes = tf.reshape(bboxes, [num_instances, 4])
-                # bboxes.set_shape([num_instances, 4])
                 box_vector = tf.reshape(bboxes, [-1])
                 zero_pad = tf.zeros([max_objects*4] - tf.shape(box_vector), dtype=box_vector.dtype)
                 padded_boxes = tf.concat([box_vector, zero_pad], axis=0)
@@ -312,20 +308,18 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 # ones = tf.ones([tf.shape(padded_boxes)[0], 1], dtype=padded_boxes.dtype)
                 padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
                 padded_boxes_with_conf.set_shape([max_objects, 5])
-                image.set_shape([self.crop_height, self.crop_width, 3])
+                # image.set_shape([self.crop_height, self.crop_width, 3])
+                padded_boxes_with_conf = tf.Print(padded_boxes_with_conf, [num_instances, ih, iw])
                 example_values = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
-
+                # example_values = {
+                #     'coco_images': tf.random_normal([224, 224, 3]),
+                #     'boxes': tf.random_normal([max_objects, 5]),
+                #     'num_objects': tf.constant(0, dtype=tf.int32),
+                #     'ih': tf.constant(224, dtype=tf.int32), #ih,
+                #     'iw': tf.constant(224, dtype=tf.int32), #iw,
+                # }
                 for k, v in example_values.iteritems():
                     batch_tensors[k].append(v)
-
-                # data[i]['mask_coco'].set_shape([self.crop_height, self.crop_width, 1])
-                # data[i] = {
-                #     'images': tf.random_normal([224, 224, 3]),
-                #     'boxes': bboxes,
-                #     'garbage_image': image,
-                #     'num_objects': tf.constant(1, dtype=tf.int32),
-                # }
-                # data[i]['prints'] = [p1, p2]
 
             data[i] = {k: tf.stack(v) for k, v in batch_tensors.iteritems()}
 

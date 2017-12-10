@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tfutils import base, data, model, optimizer, utils
 from coco_provider import COCO
+from data_provider import Combine_world
 from yolo_tiny_net import YoloTinyNet
 
 var_dict = None
@@ -24,10 +25,12 @@ class CocoYolo():
         Please set the seed to your group number. You can also change the batch
         size and n_epochs if you want but please do not change the rest.
         """
-        batch_size = 8
+        batch_size = 1
         seed = 0
         thres_loss = 1000
         n_epochs = 90
+        datasets = {'imagenet': 1, 'coco': 1}
+        crop_size = 224
         common_params = {
             'image_size': 224,
             'num_classes': 20,
@@ -59,8 +62,9 @@ class CocoYolo():
         # boxes_val = sess.run(boxes)
         # import pdb; pdb.set_trace()
         for i in range(1000):
-            ih, iw, image, obj_count, boxes = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects', 'boxes']]) #['images', 'labels', 
-            print ih, iw, image.shape, obj_count
+            # ih, iw, image, obj_count, boxes = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects', 'boxes']]) #['images', 'labels', 
+            ih, iw = sess.run([var_dict[k] for k in  ['ih', 'iw']])
+            print i, ih, iw#, image.shape, obj_count
         import pdb; pdb.set_trace()
         train_results, p = sess.run([train_targets, var_dict['print']])
         for i, result in enumerate(train_results):
@@ -94,9 +98,16 @@ class CocoYolo():
         params['train_params'] = {
             'data_params': {
                 # ImageNet data provider arguments
-                'func': COCO,
+                'func': Combine_world,
+                'cfg_dataset': self.Config.datasets,
                 'group': 'train',
-                'batch_size': self.Config.batch_size,
+                'crop_size': self.Config.crop_size,
+                # TFRecords (super class) data provider arguments
+                'file_pattern': 'train*.tfrecords',
+                'batch_size':  self.Config.batch_size,
+                'shuffle': False,
+                'shuffle_seed': self.Config.seed,
+                'file_grab_func': self.subselect_tfrecords,
                 'n_threads': 1,
             },
             'queue_params': {

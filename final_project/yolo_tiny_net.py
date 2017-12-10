@@ -158,6 +158,8 @@ class YoloTinyNet(Net):
     # Get the activations for each input image, then combine the dicts
     imagenet_input = inputs['images']
     coco_input = inputs['coco_images']
+    for v in (imagenet_input, coco_input):
+        v.set_shape([self.batch_size, self.image_size, self.image_size, 3])
 
     imagenet_output = self.yolo_shared(imagenet_input)
     coco_output = self.yolo_shared(coco_input, reuse=True)
@@ -248,17 +250,20 @@ class YoloTinyNet(Net):
     # max_x = (label[0] + label[2] / 2) / (self.image_size // self.cell_size)
     # min_y = (label[1] - label[3] / 2) / (self.image_size // self.cell_size)
     # max_y = (label[1] + label[3] / 2) / (self.image_size // self.cell_size)
+    # label is actually x1, y1, x2, y2, class_label
+    (min_x_label, max_x_label), (min_y_label, max_y_label) =\
+        [[f(label[i], label[i+2]) for f in tf.minimum, tf.maximum] for i in (0, 1)]
 
-    min_x = tf.minimum(self.image_size-1.0, label[0]) / (self.image_size // self.cell_size)
-    max_x = tf.minimum(self.image_size-1.0, label[2]) / (self.image_size // self.cell_size)
-    min_y = tf.minimum(self.image_size-1.0, label[1]) / (self.image_size // self.cell_size)
-    max_y = tf.minimum(self.image_size-1.0, label[3]) / (self.image_size // self.cell_size)
+    min_x = tf.minimum(self.image_size-1.0, min_x_label) / (self.image_size // self.cell_size)
+    max_x = tf.minimum(self.image_size-1.0, max_x_label) / (self.image_size // self.cell_size)
+    min_y = tf.minimum(self.image_size-1.0, min_y_label) / (self.image_size // self.cell_size)
+    max_y = tf.minimum(self.image_size-1.0, max_y_label) / (self.image_size // self.cell_size)
 
     min_x = tf.floor(min_x)
     min_y = tf.floor(min_y)
 
-    max_x = tf.ceil(max_x)
-    max_y = tf.ceil(max_y)
+    max_x = tf.ceil(max_x) #tf.maximum(tf.ceil(max_x), min_x+1)
+    max_y = tf.ceil(max_y) #tf.maximum(tf.ceil(max_y), min_y+1)
 
     temp = tf.cast(tf.stack([max_y - min_y, max_x - min_x]), dtype=tf.int32)
     objects = tf.ones(temp, tf.float32)
