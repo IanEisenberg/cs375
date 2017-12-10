@@ -22,7 +22,7 @@ original_labels = [1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 13, 14, 15, 16, 17
        57, 58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77,
        78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
 
-max_objects = 64
+max_objects = 96
 
 labels_dict = {}
 for idx, lab in enumerate(original_labels):
@@ -247,7 +247,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
             batch_tensors = collections.defaultdict(list)
             for j in range(self.batch_size):
                 inputs = {k: d[k][j] for k in d}
-
                 image = inputs['images']
                 image = tf.decode_raw(image, tf.uint8)
                 ih = inputs['height']
@@ -312,11 +311,11 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 padded_boxes_with_conf = tf.Print(padded_boxes_with_conf, [num_instances, ih, iw])
                 example_values = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
                 # example_values = {
-                #     'coco_images': tf.random_normal([224, 224, 3]),
+                #     'coco_images': image,#tf.random_normal([224, 224, 3]),
                 #     'boxes': tf.random_normal([max_objects, 5]),
-                #     'num_objects': tf.constant(0, dtype=tf.int32),
-                #     'ih': tf.constant(224, dtype=tf.int32), #ih,
-                #     'iw': tf.constant(224, dtype=tf.int32), #iw,
+                #     'num_objects': num_instances, #tf.constant(0, dtype=tf.int32),
+                #     'ih': ih,
+                #     'iw': iw,
                 # }
                 for k, v in example_values.iteritems():
                     batch_tensors[k].append(v)

@@ -61,10 +61,12 @@ class CocoYolo():
         # boxes = var_dict['boxes']
         # boxes_val = sess.run(boxes)
         # import pdb; pdb.set_trace()
-        for i in range(1000):
+        max_obj = 0
+        for i in range(50000):
             # ih, iw, image, obj_count, boxes = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects', 'boxes']]) #['images', 'labels', 
-            ih, iw = sess.run([var_dict[k] for k in  ['ih', 'iw']])
-            print i, ih, iw#, image.shape, obj_count
+            ih, iw, obj_count = sess.run([var_dict[k] for k in  ['ih', 'iw', 'num_objects']])
+            max_obj = max(max_obj, obj_count)
+            print i, ih, iw, obj_count#, image.shape, obj_count
         import pdb; pdb.set_trace()
         train_results, p = sess.run([train_targets, var_dict['print']])
         for i, result in enumerate(train_results):
