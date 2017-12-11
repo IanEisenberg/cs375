@@ -259,7 +259,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 
                 imsize = tf.size(image)
 
-                image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
+                # image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
 
                 image = tf.cond(tf.equal(imsize, ih * iw), \
                       lambda: tf.image.grayscale_to_rgb(tf.reshape(image, (ih, iw, 1))), \
@@ -307,8 +307,8 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 # ones = tf.ones([tf.shape(padded_boxes)[0], 1], dtype=padded_boxes.dtype)
                 padded_boxes_with_conf = tf.concat([padded_boxes, padded_labels], 1) #tf.pad(padded_boxes, tf.constant([[0,0],[0,1]]), constant_values=1.0)
                 padded_boxes_with_conf.set_shape([max_objects, 5])
-                # image.set_shape([self.crop_height, self.crop_width, 3])
-                padded_boxes_with_conf = tf.Print(padded_boxes_with_conf, [num_instances, ih, iw])
+                image.set_shape([self.crop_height, self.crop_width, 3])
+                # padded_boxes_with_conf = tf.Print(padded_boxes_with_conf, [num_instances, ih, iw])
                 example_values = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
                 # example_values = {
                 #     'coco_images': image,#tf.random_normal([224, 224, 3]),

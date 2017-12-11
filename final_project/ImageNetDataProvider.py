@@ -30,7 +30,9 @@ class ImageNetDataProvider(data.TFRecordsParallelByFileProvider):
         source_dirs = [os.path.join(data_path, attr) 
                 for attr in ['images', 'labels_0']]
 
-        postprocess = {'images': [(self.postproc_imgs, (), {})]}
+        postprocess = {'images': [(self.postproc_imgs, (), {})],
+        'labels': [(self.postproc_labels, (), {})]}
+
 
         super(ImageNetDataProvider, self).__init__(
             source_dirs,
@@ -65,6 +67,7 @@ class ImageNetDataProvider(data.TFRecordsParallelByFileProvider):
         else:
             raise NotImplementedError(
                     'group not valid -  please choose train or val')
+        # ims.set_shape([224, 224, 3])
         return ims
 
     def postproc_labels(self, labels):
@@ -72,6 +75,7 @@ class ImageNetDataProvider(data.TFRecordsParallelByFileProvider):
         Label preprocessing function
         """
         labels = tf.cast(labels, dtype=tf.int64)
+        labels.set_shape([1])
         return labels
 
 

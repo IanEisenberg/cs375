@@ -72,6 +72,8 @@ class ImageNetYOLO():
             validate_first: run validation before starting the training
         """
 
+        params['inter_op_parallelism_threads'] = 500
+
         params['train_params'] = {
             'data_params': {
                 # ImageNet data provider arguments
@@ -81,7 +83,7 @@ class ImageNetYOLO():
                 'crop_size': self.Config.crop_size,
                 # TFRecords (super class) data provider arguments
                 'file_pattern': 'train*.tfrecords',
-                'batch_size':  self.Config.batch_size,
+                'batch_size':  1, #self.Config.batch_size,
                 'shuffle': False,
                 'shuffle_seed': self.Config.seed,
                 'file_grab_func': self.subselect_tfrecords,
@@ -251,8 +253,8 @@ class ImageNetYOLO():
             'collname': 'yolo',
             'exp_id': 'combined',
             'save_valid_freq': 10000,
-            'save_filters_freq': 30000,
-            'cache_filters_freq': 50000,
+            'save_filters_freq': 5000,
+            'cache_filters_freq': 5000,
             'save_metrics_freq': 200,
             'save_initial_filters' : False,
             'save_to_gfs': [],
