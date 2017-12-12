@@ -191,6 +191,14 @@ class YoloTinyNet(Net):
 
     return outputs, {}
 
+  def validation(self, inputs, train=False, norm=True, **kwargs):
+    outputs = inputs
+    images = inputs['images']
+    layer_output = self.yolo_shared(images)
+    for key in layer_output.keys():
+      outputs[key] = layer_output[key]
+    return outputs, {}
+
   def iou(self, boxes1, boxes2):
     """calculate ious
     Args:

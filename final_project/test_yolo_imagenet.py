@@ -129,7 +129,7 @@ class NeuralDataExperiment():
         model_params defines the model to be tested - in our case, YoloTinyNet
         """
         params['model_params'] = {
-            'func': self.Config.ytn.inference,
+            'func': self.Config.ytn.validation,
         }
 
         """
