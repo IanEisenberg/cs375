@@ -44,7 +44,7 @@ class ImageNetYOLO():
             'coord_scale':1
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = 300000#1500
+        train_steps = 80000#1500
         val_steps = 100
 
 
@@ -87,7 +87,7 @@ class ImageNetYOLO():
                 'shuffle': False,
                 'shuffle_seed': self.Config.seed,
                 'file_grab_func': self.subselect_tfrecords,
-                'n_threads': 1# sum(self.Config.datasets.values()),
+                'n_threads': 1,#sum(self.Config.datasets.values()),
             },
             'queue_params': {
                 'queue_type': 'random',
@@ -340,4 +340,6 @@ if __name__ == '__main__':
     base.get_params()
     m = ImageNetYOLO()
     params = m.setup_params()
-    base.train_from_params(**params)
+    while True:
+        params['train_params']['num_steps'] += 10000
+        base.train_from_params(**params)
