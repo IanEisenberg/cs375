@@ -26,7 +26,7 @@ class NeuralDataExperiment():
         """
         target_layers = ['conv_1','conv_2','conv_3','conv_4','conv_5','conv_6','conv_7','conv_8','conv_9','fc1',
                          'fc2']
-        batch_size = 1
+        batch_size = 2
         data_path = '/datasets/neural_data/tfrecords_with_meta'
         noise_estimates_path = '/datasets/neural_data/noise_estimates.npy'
         seed = 5
@@ -50,7 +50,7 @@ class NeuralDataExperiment():
         #feature_masks = {}
 	extraction_step = None
         extraction_targets = [attr[0] for attr in NeuralDataProvider.ATTRIBUTES] + target_layers
-        ytn = YoloTinyNet(common_params,net_params,test=False)
+        ytn = YoloTinyNet(common_params,net_params,test=True)
         assert NeuralDataProvider.N_VAL % batch_size == 0, \
                 ('number of examples not divisible by batch size!')
         val_steps = int(NeuralDataProvider.N_VAL / batch_size)
@@ -140,7 +140,7 @@ class NeuralDataExperiment():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'imagenet',
+            'exp_id': 'combined',
             'save_to_gfs': [],
         }
 
@@ -152,7 +152,7 @@ class NeuralDataExperiment():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'imagenet',
+            'exp_id': 'combined',
             'do_restore': True,
             'load_query': None,
             'query': {'step': self.Config.extraction_step} \
