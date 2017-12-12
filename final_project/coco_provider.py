@@ -298,7 +298,11 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 x2 *= w_scale
                 y1 *= h_scale
                 y2 *= h_scale
-                padded_boxes = tf.stack([x1, y1, x2, y2], axis=1)
+                x_center = (x1 + x2) / 2
+                y_center = (y1 + y2) / 2
+                w = tf.abs(x2 - x1)
+                h = tf.abs(y2 - y1)
+                padded_boxes = tf.stack([x_center, y_center, w, h], axis=1)
 
                 zero_pad = tf.zeros([max_objects] - tf.shape(labels), dtype=labels.dtype)
                 padded_labels = tf.reshape(tf.cast(tf.concat([labels, zero_pad], axis=0), tf.float64), [-1, 1])

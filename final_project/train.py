@@ -182,7 +182,7 @@ class ImageNetYOLO():
             predicts = outputs['bboxes']
             gt_boxes = tf.reshape(tf.cast(outputs['boxes'], tf.int32), [self.Config.batch_size, -1, 5])
             num_objects = outputs['num_objects']
-            coco_loss, nonsense, p = self.Config.ytn.loss(predicts, gt_boxes, num_objects)
+            coco_loss, _, _ = self.Config.ytn.loss(predicts, gt_boxes, num_objects)
             # imagenet
             labels = outputs['labels']
             logits = outputs['logits']
@@ -251,7 +251,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'combined_loss_test',
             'save_valid_freq': 10000,
             'save_filters_freq': 5000,
             'cache_filters_freq': 5000,
