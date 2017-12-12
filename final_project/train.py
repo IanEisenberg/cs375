@@ -44,7 +44,7 @@ class ImageNetYOLO():
             'coord_scale':1
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = 80000#1500
+        train_steps = 150000#1500
         val_steps = 100
 
 
@@ -251,7 +251,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined_loss_test',
+            'exp_id': 'combined_fix',
             'save_valid_freq': 10000,
             'save_filters_freq': 5000,
             'cache_filters_freq': 5000,
@@ -275,7 +275,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'imagenet',
             'do_restore': True,
             'load_query': None,
         }

@@ -227,9 +227,9 @@ class COCO(data.TFRecordsParallelByFileProvider):
                     'segmentation_masks', 'width', 'bboxes']
 
         # key_list = ['images']
-        source_dirs = ['/mnt/data/mscoco/train_tfrecords_no0/{}/' .format(v) for v in key_list]
+        source_dirs = ['/datasets/mscoco2/train_tfrecords/{}/' .format(v) for v in key_list]
         
-        BYTES_KEYs = ['images', 'labels', 'segmentation_masks', 'bboxes']
+        BYTES_KEYs = {'images', 'labels', 'segmentation_masks', 'bboxes'}
 
         meta_dicts = [{v : {'dtype': tf.string, 'shape': []}} if v in BYTES_KEYs else {v : {'dtype': tf.int64, 'shape': []}} for v in key_list]
 
@@ -289,6 +289,9 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 zero_pad = tf.zeros([max_objects*4] - tf.shape(box_vector), dtype=box_vector.dtype)
                 padded_boxes = tf.concat([box_vector, zero_pad], axis=0)
                 padded_boxes = tf.reshape(padded_boxes, [-1, 4])
+                # padded_boxes = tf.Print(padded_boxes, [padded_boxes[:num_instances]], message='bboxes', summarize=8)
+
+                # ih = tf.Print(ih, [padded_boxes[:num_instances]], summarize=8, message='Boxes')
                 # we need to turn these into x_center, y_center, w, h
                 # x_center, y_center = [(padded_boxes[:,j] + padded_boxes[:,j+2])/2 for j in (0,1)]
                 # w, h = [(padded_boxes[:,j+2] - padded_boxes[:,j]) for j in (0,1)]
