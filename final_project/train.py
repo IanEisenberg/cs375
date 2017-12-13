@@ -44,7 +44,7 @@ class ImageNetYOLO():
             'coord_scale':1
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = 80000#1500
+        train_steps = 160000#1500
         val_steps = 100
 
 
@@ -182,7 +182,7 @@ class ImageNetYOLO():
             predicts = outputs['bboxes']
             gt_boxes = tf.reshape(tf.cast(outputs['boxes'], tf.int32), [self.Config.batch_size, -1, 5])
             num_objects = outputs['num_objects']
-            coco_loss, nonsense, p = self.Config.ytn.loss(predicts, gt_boxes, num_objects)
+            coco_loss, _, _ = self.Config.ytn.loss(predicts, gt_boxes, num_objects)
             # imagenet
             labels = outputs['labels']
             logits = outputs['logits']
@@ -219,7 +219,7 @@ class ImageNetYOLO():
         
         params['learning_rate_params'] = {	
             'func': tf.train.exponential_decay,
-            'learning_rate': 0.0001,
+            'learning_rate': 0.001,
             'decay_steps': 5000, # FIX LATER,
             'decay_rate': 0.95,
             'staircase': True,
@@ -251,7 +251,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'combined_fix',
             'save_valid_freq': 10000,
             'save_filters_freq': 5000,
             'cache_filters_freq': 5000,
@@ -275,7 +275,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'imagenet',
             'do_restore': True,
             'load_query': None,
         }
@@ -341,8 +341,8 @@ if __name__ == '__main__':
     m = ImageNetYOLO()
     params = m.setup_params()
     while True:
-        params['train_params']['num_steps'] += 10000
         try:
             base.train_from_params(**params)
         except Exception:
             pass
+        params['train_params']['num_steps'] += 10000

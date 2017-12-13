@@ -244,31 +244,19 @@ class YoloTinyNet(Net):
     calculate loss
     Args:
       predict: 3-D tensor [cell_size, cell_size, 5 * boxes_per_cell]
-      labels : [max_objects, 5]  (x_center, y_center, w, h, class)
+      labels : [max_objects, 5]  (x_center, y_center, width, height, class)
     """
-    label = labels[num:num+1, :]
+    label = labels[num:num+1, :] 
     label = tf.cast(tf.reshape(label, [-1]), tf.float32)
-    # x_center, y_center = [(label[j] + label[j+2])/2 for j in (0,1)]
-    # w, h = [(label[j+2] - label[j]) for j in (0,1)]
-    # label = [x_center, y_center, w, h, label[4]]
-
 
     #calculate objects  tensor [CELL_SIZE, CELL_SIZE]
-    # min_x = (label[0] - label[2] / 2) / (self.image_size // self.cell_size)
-    # max_x = (label[0] + label[2] / 2) / (self.image_size // self.cell_size)
-    # min_y = (label[1] - label[3] / 2) / (self.image_size // self.cell_size)
-    # max_y = (label[1] + label[3] / 2) / (self.image_size // self.cell_size)
-    # label is actually x1, y1, x2, y2, class_label
-    (min_x_label, max_x_label), (min_y_label, max_y_label) =\
-        [[f(label[i], label[i+2]) for f in tf.minimum, tf.maximum] for i in (0, 1)]
+    min_x = (label[0] - label[2] / 2) / (self.image_size // self.cell_size)
+    max_x = (label[0] + label[2] / 2) / (self.image_size // self.cell_size)
+    min_y = (label[1] - label[3] / 2) / (self.image_size // self.cell_size)
+    max_y = (label[1] + label[3] / 2) / (self.image_size // self.cell_size)
 
-    min_x = tf.minimum(self.image_size-1.0, min_x_label) / (self.image_size // self.cell_size)
-    max_x = tf.minimum(self.image_size-1.0, max_x_label) / (self.image_size // self.cell_size)
-    min_y = tf.minimum(self.image_size-1.0, min_y_label) / (self.image_size // self.cell_size)
-    max_y = tf.minimum(self.image_size-1.0, max_y_label) / (self.image_size // self.cell_size)
-
-    min_x = tf.floor(min_x)
-    min_y = tf.floor(min_y)
+    min_x = tf.maximum(tf.floor(min_x), 0)
+    min_y = tf.maximum(tf.floor(min_y), 0)
 
     max_x = tf.ceil(max_x) #tf.maximum(tf.ceil(max_x), min_x+1)
     max_y = tf.ceil(max_y) #tf.maximum(tf.ceil(max_y), min_y+1)
@@ -278,39 +266,36 @@ class YoloTinyNet(Net):
 
     temp = tf.cast(tf.stack([min_y, self.cell_size - max_y, min_x, self.cell_size - max_x]), tf.int32)
     temp = tf.reshape(temp, (2, 2))
-    objects = tf.pad(objects, temp, "CONSTANT")
+    # objects is a [cell_size, cell_size] tensor with 1's where the ground truth object is
+    objects = tf.pad(objects, temp, "CONSTANT") 
 
-    #calculate objects  tensor [CELL_SIZE, CELL_SIZE]
     #calculate responsible tensor [CELL_SIZE, CELL_SIZE]
-    center_x = (min_x + max_x)/2 #((label[2]-label[0])/2) / (self.image_size / self.cell_size)
+    center_x = label[0] / (self.image_size / self.cell_size)
     center_x = tf.floor(center_x)
 
-    center_y = (min_y + max_y)/2 #((label[3]-label[1])/2) / (self.image_size / self.cell_size)
+    center_y = label[1] / (self.image_size / self.cell_size)
     center_y = tf.floor(center_y)
 
     response = tf.ones([1, 1], tf.float32)
 
     temp = tf.cast(tf.stack([center_y, self.cell_size - center_y - 1, center_x, self.cell_size -center_x - 1]), tf.int32)
     temp = tf.reshape(temp, (2, 2))
-    response = tf.pad(response, temp, "CONSTANT")
-    #objects = response
+    # response is a [cell_size, cell_size] tensor with a single 1 in the cell at the center of the bounding box
+    response = tf.pad(response, temp, "CONSTANT")     #objects = response
 
     #calculate iou_predict_truth [CELL_SIZE, CELL_SIZE, BOXES_PER_CELL]
+    ## Predictions are initially scaled by [ cell_px, cell_px, w, h ] (i.e. in [0, 1] ranges). Rescale them to pixel coordinates.
     predict_boxes = predict[:, :, self.num_classes + self.boxes_per_cell:]
-    
-
     predict_boxes = tf.reshape(predict_boxes, [self.cell_size, self.cell_size, self.boxes_per_cell, 4])
-
     predict_boxes = predict_boxes * [self.image_size / self.cell_size, self.image_size / self.cell_size, self.image_size, self.image_size]
 
+    ## After scaling, apply translation to fully convert to image pixel coordinate space.
     base_boxes = np.zeros([self.cell_size, self.cell_size, 4])
-
     for y in range(self.cell_size):
       for x in range(self.cell_size):
         #nilboy
         base_boxes[y, x, :] = [self.image_size / self.cell_size * x, self.image_size / self.cell_size * y, 0, 0]
     base_boxes = np.tile(np.resize(base_boxes, [self.cell_size, self.cell_size, 1, 4]), [1, 1, self.boxes_per_cell, 1])
-
     predict_boxes = base_boxes + predict_boxes
 
     iou_predict_truth = self.iou(predict_boxes, label[0:4])

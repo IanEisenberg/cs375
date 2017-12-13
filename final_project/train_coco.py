@@ -10,6 +10,8 @@ from tfutils import base, data, model, optimizer, utils
 from coco_provider import COCO
 from data_provider import Combine_world
 from yolo_tiny_net import YoloTinyNet
+from scipy.misc import imsave
+from skimage.draw import line_aa
 
 var_dict = None
 
@@ -62,11 +64,21 @@ class CocoYolo():
         # boxes_val = sess.run(boxes)
         # import pdb; pdb.set_trace()
         max_obj = 0
-        for i in range(50000):
+        for i in range(20):
             # ih, iw, image, obj_count, boxes = sess.run([var_dict[k] for k in  ['ih', 'iw', 'images', 'num_objects', 'boxes']]) #['images', 'labels', 
-            ih, iw, obj_count = sess.run([var_dict[k] for k in  ['ih', 'iw', 'num_objects']])
+            ih, iw, obj_count, boxes, images = sess.run([var_dict[k] for k in  ['ih', 'iw', 'num_objects', 'boxes', 'images']])
             max_obj = max(max_obj, obj_count)
-            print i, ih, iw, obj_count#, image.shape, obj_count
+            print i, ih, iw, obj_count, boxes[0][:obj_count[0]]#, image.shape, obj_count
+
+            img = np.array(images[0])
+            x_center, y_center, w, h = boxes[0, 0, :4]
+            coords = [(x_center - w/2), (x_center + w/2), (y_center-h/2), (y_center+h/2)] # x1, x2, y1, y2
+            x1, x2, y1, y2 = [int(c) for c in coords]
+            print([int(c) for c in coords])
+            rr, cc, val = line_aa(y1, x1, y2, x2)
+            img[rr, cc, 0] = val
+            imsave('image_{}.png'.format(i), img)
+
         import pdb; pdb.set_trace()
         train_results, p = sess.run([train_targets, var_dict['print']])
         for i, result in enumerate(train_results):
