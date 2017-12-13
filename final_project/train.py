@@ -44,7 +44,7 @@ class ImageNetYOLO():
             'coord_scale':1
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = 150000#1500
+        train_steps = 160000#1500
         val_steps = 100
 
 
@@ -219,7 +219,7 @@ class ImageNetYOLO():
         
         params['learning_rate_params'] = {	
             'func': tf.train.exponential_decay,
-            'learning_rate': 0.0001,
+            'learning_rate': 0.001,
             'decay_steps': 5000, # FIX LATER,
             'decay_rate': 0.95,
             'staircase': True,
@@ -341,8 +341,8 @@ if __name__ == '__main__':
     m = ImageNetYOLO()
     params = m.setup_params()
     while True:
-        params['train_params']['num_steps'] += 10000
         try:
             base.train_from_params(**params)
         except Exception:
             pass
+        params['train_params']['num_steps'] += 10000

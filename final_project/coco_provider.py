@@ -28,201 +28,30 @@ labels_dict = {}
 for idx, lab in enumerate(original_labels):
     labels_dict[lab] = idx + 1 # 0 is the background class
 
-def _smallest_size_at_least(height, width, smallest_side):
-    smallest_side = tf.convert_to_tensor(smallest_side, dtype=tf.int32)
-
-    height = tf.to_float(height)
-    width = tf.to_float(width)
-    smallest_side = tf.to_float(smallest_side)
-
-    scale = tf.cond(tf.greater(height, width),
-                  lambda: smallest_side / width,
-                  lambda: smallest_side / height)
-    new_height = tf.to_int32(height * scale)
-    new_width = tf.to_int32(width * scale)
-    return new_height, new_width
-
-def preprocess_for_training(image, image_min_size = 240):
-    
-    ih, iw = tf.shape(image)[0], tf.shape(image)[1]
-
-    ## min size resizing
-    new_ih, new_iw = _smallest_size_at_least(ih, iw, image_min_size)
-    image = tf.expand_dims(image, 0)
-    image = tf.image.resize_bilinear(image, [new_ih, new_iw], align_corners=False)
-    # image = tf.squeeze(image, axis=[0])
-
-    # gt_masks = tf.expand_dims(gt_masks, -1)
-    # gt_masks = tf.cast(gt_masks, tf.float32)
-    # gt_masks = tf.image.resize_nearest_neighbor(gt_masks, [new_ih, new_iw], align_corners=False)
-    # gt_masks = tf.cast(gt_masks, tf.int32)
-    # gt_masks = tf.squeeze(gt_masks, axis=[-1])
-
-    return image
-
 def _scale_image(image, image_height, image_width):
     ih, iw = tf.shape(image)[0], tf.shape(image)[1]
     image = tf.expand_dims(image, 0)
-    image = tf.image.resize_bilinear(image, [image_height, image_width], align_corners=False)
+    image = tf.image.resize_bilinear(image, [image_height, image_width], align_corners=True)
     image = tf.squeeze(image, axis=[0])
 
     return image, image_height / ih, image_width / iw
-
-def combine_masks(gt_masks, labels):
-    def _time_label(input_elem):
-        gt_mask, label = input_elem
-        gt_mask = tf.cast(gt_mask, tf.int32)
-        label = tf.cast(label, tf.int32)
-        label = label + 1
-        return gt_mask*label
-
-    return tf.add_n(tf.map_fn(_time_label, (gt_masks, labels), dtype = tf.int32))
-
-def combine_masks_pyfunc(instance_cats, gt_mask, gt_map):
-    #print(instance_cats)
-    instance_cats = instance_cats[:, 0]
-    sorted_indices = np.argsort(instance_cats)
-    sorted_instance_cats = instance_cats[sorted_indices]
-    unique_cats, reduce_idx = np.unique(sorted_instance_cats, return_index=True)
-    sorted_gt_mask = gt_mask[sorted_indices, :, :]
-    processed_mask = np.add.reduceat(gt_mask, reduce_idx, axis=0)
-    processed_mask = np.minimum(processed_mask, 1) # ensure values are 0 and 1
-    for cat_idx, cat in enumerate(unique_cats):
-        gt_map = gt_map + processed_mask[cat_idx]*(cat + 1)
-
-    print(gt_map.shape)
-    #print(processed_mask.shape)
-
-    return gt_map
-
-# preprocesses the ground truth map
-def preprocess_gtmap(instance_cats, gt_mask, gt_map):
-    instance_cats = instance_cats[:, 0]
-    #instance_cats = np.array([labels_dict[cat] for cat in instance_cats]) # map them to be 1-80
-    sorted_indices = np.argsort(instance_cats)
-    sorted_instance_cats = instance_cats[sorted_indices]
-    unique_cats, reduce_idx = np.unique(sorted_instance_cats, return_index=True)
-    sorted_gt_mask = gt_mask[sorted_indices, :, :]
-    processed_mask = np.add.reduceat(gt_mask, reduce_idx, axis=0)
-    processed_mask = np.minimum(processed_mask, 1) # ensure values are 0 and 1
-    for cat_idx, cat in enumerate(unique_cats):
-        gt_map[0, :, :, cat] = processed_mask[cat_idx, :, :]
-    return gt_map
-
-def _crop(image, offset_height, offset_width, crop_height, crop_width):
-
-    original_shape = tf.shape(image)
-
-    rank_assertion = tf.Assert(
-      tf.equal(tf.rank(image), 3),
-      ['Rank of image must be equal to 3.'])
-    cropped_shape = control_flow_ops.with_dependencies(
-      [rank_assertion],
-      tf.stack([crop_height, crop_width, original_shape[2]]))
-
-    size_assertion = tf.Assert(
-      tf.logical_and(
-          tf.greater_equal(original_shape[0], crop_height),
-          tf.greater_equal(original_shape[1], crop_width)),
-      ['Crop size greater than the image size.'])
-
-    offsets = tf.to_int32(tf.stack([offset_height, offset_width, 0]))
-
-    # Use tf.slice instead of crop_to_bounding box as it accepts tensors to
-    # define the crop size.
-    image = control_flow_ops.with_dependencies(
-      [size_assertion],
-      tf.slice(image, offsets, cropped_shape))
-    return tf.reshape(image, cropped_shape)
-
-def _central_crop(image, crop_height, crop_width):
-
-    image_height = tf.shape(image)[0]
-    image_width = tf.shape(image)[1]
-
-    offset_height = (image_height - crop_height) / 2
-    offset_width = (image_width - crop_width) / 2
-
-    output_image = _crop(image, offset_height, offset_width,
-                               crop_height, crop_width)
-    return output_image
-
-def _random_crop(image, label, crop_height, crop_width):
-    
-    #image = tf.Print(image, [tf.shape(image)], message = 'Shape of image')
-    #label = tf.Print(label, [tf.shape(label)], message = 'Shape of label')
-
-    image_list = [image]
-    label_list = [label]
-
-    # Compute the rank assertions.
-    rank_assertions = []
-    for i in range(len(image_list)):
-        image_rank = tf.rank(image_list[i])
-        rank_assert = tf.Assert(
-            tf.equal(image_rank, 3),
-            ['Wrong rank for tensor  %s [expected] [actual]',
-             image_list[i].name, 3, image_rank])
-        rank_assertions.append(rank_assert)
-
-    image_shape = control_flow_ops.with_dependencies(
-        [rank_assertions[0]],
-        tf.shape(image_list[0]))
-
-    image_height = image_shape[0]
-    image_width = image_shape[1]
-    crop_size_assert = tf.Assert(
-        tf.logical_and(
-            tf.greater_equal(image_height, crop_height),
-            tf.greater_equal(image_width, crop_width)),
-        ['Crop size greater than the image size.', image_height, image_width, crop_height, crop_width])
-
-    asserts = [rank_assertions[0], crop_size_assert]
-
-    # Create a random bounding box.
-    #
-    # Use tf.random_uniform and not numpy.random.rand as doing the former would
-    # generate random numbers at graph eval time, unlike the latter which
-    # generates random numbers at graph definition time.
-    max_offset_height = control_flow_ops.with_dependencies(
-        asserts, tf.reshape(image_height - crop_height + 1, []))
-    max_offset_width = control_flow_ops.with_dependencies(
-        asserts, tf.reshape(image_width - crop_width + 1, []))
-    offset_height = tf.random_uniform(
-        [], maxval=max_offset_height, dtype=tf.int32)
-    offset_width = tf.random_uniform(
-        [], maxval=max_offset_width, dtype=tf.int32)
-
-    cropped_images = [_crop(image, offset_height, offset_width,
-                          crop_height, crop_width) for image in image_list]
-    cropped_labels = [_crop(label, offset_height, offset_width,
-                          crop_height, crop_width) for label in label_list]
-    return cropped_images[0], cropped_labels[0]
 
 # Build data provider for COCO dataset
 class COCO(data.TFRecordsParallelByFileProvider):
 
     def __init__(self,
-                 # data_path,
-                 # source_dirs=['/mnt/data/mscoco/train_tfrecords'],
-                 #key_list,
-                 # meta_dicts,
                  group='train',
                  batch_size=1,
                  n_threads=4,
-                 image_min_size = 240,
                  crop_height = 224,
                  crop_width = 224,
                  *args,
                  **kwargs):
         self.group = group
         self.batch_size = batch_size
-        self.image_min_size = image_min_size
         self.crop_height = crop_height
         self.crop_width = crop_width
 
-        #source_dirs = [data_path['%s/%s' % (self.group, v)] for v in key_list]
-        #meta_dicts = [{v : {'dtype': tf.string, 'shape': []}} if v in BYTES_KEYs else {v : {'dtype': tf.int64, 'shape': []}} for v in key_list]
         key_list = ['height', 'images', 'labels', 'num_objects', \
                     'segmentation_masks', 'width', 'bboxes']
 
@@ -256,10 +85,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 inputs['height'] = ih
                 inputs['width'] = iw
                 bboxes = tf.decode_raw(inputs['bboxes'], tf.float64)
-                
                 imsize = tf.size(image)
-
-                # image = tf.Print(image, [imsize, ih, iw], message = 'Imsize')
 
                 image = tf.cond(tf.equal(imsize, ih * iw), \
                       lambda: tf.image.grayscale_to_rgb(tf.reshape(image, (ih, iw, 1))), \
@@ -272,16 +98,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 inputs['num_objects'] = num_instances
                 
                 labels = tf.decode_raw(inputs['labels'], tf.int32)
-                # labels = tf.reshape(labels, [num_instances, 1])
-                #labels = tf.Print(labels, [labels], message = 'Labels')
-                # inputs['labels'] = labels
-                # single_label = labels[0]
-
-                # gt_boxes = tf.reshape(bboxes, [num_instances, 4])
-                #image = preprocess_for_training(image, self.image_min_size)
-                #image = _central_crop(image, self.crop_height, self.crop_width)
-                # x_shift, y_shift = (iw - self.crop_width)/2, (ih - self.crop_height)/2
-                # boxes = gt_boxes - [x_shift, y_shift, x_shift, y_shift]
 
                 image, h_scale, w_scale = _scale_image(image, self.crop_height, self.crop_width)
 
@@ -289,22 +105,20 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 zero_pad = tf.zeros([max_objects*4] - tf.shape(box_vector), dtype=box_vector.dtype)
                 padded_boxes = tf.concat([box_vector, zero_pad], axis=0)
                 padded_boxes = tf.reshape(padded_boxes, [-1, 4])
-                # padded_boxes = tf.Print(padded_boxes, [padded_boxes[:num_instances]], message='bboxes', summarize=8)
 
-                # ih = tf.Print(ih, [padded_boxes[:num_instances]], summarize=8, message='Boxes')
-                # we need to turn these into x_center, y_center, w, h
-                # x_center, y_center = [(padded_boxes[:,j] + padded_boxes[:,j+2])/2 for j in (0,1)]
-                # w, h = [(padded_boxes[:,j+2] - padded_boxes[:,j]) for j in (0,1)]
-                # padded_boxes = tf.stack([x_center, y_center, w, h])
-                x1, y1, x2, y2 = tf.unstack(padded_boxes, axis=1)
-                x1 *= w_scale
-                x2 *= w_scale
-                y1 *= h_scale
-                y2 *= h_scale
+                # x1, y1, x2, y2 = tf.unstack(padded_boxes, axis=1)
+                y1, x1, y2, x2 = tf.unstack(padded_boxes, axis=1)
+                # y1, y2 = tf.cast(ih, tf.float64) - y1, tf.cast(ih, tf.float64)-y2
+                # x1, x2 = tf.cast(iw, tf.float64) - x1, tf.cast(iw, tf.float64)-x2
+                x1 = tf.minimum(tf.cast(self.crop_width - 1, tf.float64), x1 * w_scale)
+                x2 = tf.minimum(tf.cast(self.crop_width - 1, tf.float64), x2 * w_scale)
+                y1 = tf.minimum(tf.cast(self.crop_height - 1, tf.float64), y1 * h_scale)
+                y2 = tf.minimum(tf.cast(self.crop_height - 1, tf.float64), y2 * h_scale)
                 x_center = (x1 + x2) / 2
                 y_center = (y1 + y2) / 2
                 w = tf.abs(x2 - x1)
                 h = tf.abs(y2 - y1)
+                # x_center = tf.Print(x_center, [iw, ih, x1[0], x2[0], w_scale, x_center[0], w[0], padded_boxes[:num_instances]], message='bboxes', summarize=8)
                 padded_boxes = tf.stack([x_center, y_center, w, h], axis=1)
 
                 zero_pad = tf.zeros([max_objects] - tf.shape(labels), dtype=labels.dtype)
@@ -317,13 +131,6 @@ class COCO(data.TFRecordsParallelByFileProvider):
                 image.set_shape([self.crop_height, self.crop_width, 3])
                 # padded_boxes_with_conf = tf.Print(padded_boxes_with_conf, [num_instances, ih, iw])
                 example_values = {'coco_images': image, 'boxes': padded_boxes_with_conf, 'num_objects': num_instances, 'ih': ih, 'iw': iw}#, 'multiple_labels': labels}
-                # example_values = {
-                #     'coco_images': image,#tf.random_normal([224, 224, 3]),
-                #     'boxes': tf.random_normal([max_objects, 5]),
-                #     'num_objects': num_instances, #tf.constant(0, dtype=tf.int32),
-                #     'ih': ih,
-                #     'iw': iw,
-                # }
                 for k, v in example_values.iteritems():
                     batch_tensors[k].append(v)
 
@@ -331,15 +138,9 @@ class COCO(data.TFRecordsParallelByFileProvider):
 
         return data
 
-    def set_data_shapes_none(self, data):
-        for i in range(len(data)):
-            for k in data[i]:
-                data[i][k] = tf.squeeze(data[i][k], axis=[-1])
-        return data
 
     def init_ops(self):
         self.input_ops = super(COCO, self).init_ops()
-        # self.input_ops = self.set_data_shapes_none(self.input_ops)
         self.input_ops = self.prep_data(self.input_ops)
 
         return self.input_ops

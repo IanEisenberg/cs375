@@ -255,8 +255,8 @@ class YoloTinyNet(Net):
     min_y = (label[1] - label[3] / 2) / (self.image_size // self.cell_size)
     max_y = (label[1] + label[3] / 2) / (self.image_size // self.cell_size)
 
-    min_x = tf.floor(min_x)
-    min_y = tf.floor(min_y)
+    min_x = tf.maximum(tf.floor(min_x), 0)
+    min_y = tf.maximum(tf.floor(min_y), 0)
 
     max_x = tf.ceil(max_x) #tf.maximum(tf.ceil(max_x), min_x+1)
     max_y = tf.ceil(max_y) #tf.maximum(tf.ceil(max_y), min_y+1)
