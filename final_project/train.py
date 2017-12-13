@@ -38,13 +38,13 @@ class ImageNetYOLO():
             'boxes_per_cell': 2,
             'weight_decay': 0.0005,
             'cell_size': 4,
-            'object_scale':1,
-            'noobject_scale':1,
-            'class_scale':1,
-            'coord_scale':1
+            'object_scale':0.25,
+            'noobject_scale':0.125,
+            'class_scale':0.25,
+            'coord_scale':1.25
             }
         ytn = YoloTinyNet(common_params,net_params,test=False)
-        train_steps = 160000#1500
+        train_steps = 500000#1500
         val_steps = 100
 
 
@@ -219,8 +219,8 @@ class ImageNetYOLO():
         
         params['learning_rate_params'] = {	
             'func': tf.train.exponential_decay,
-            'learning_rate': 0.001,
-            'decay_steps': 5000, # FIX LATER,
+            'learning_rate': 0.01,
+            'decay_steps': 10000, # FIX LATER,
             'decay_rate': 0.95,
             'staircase': True,
         }
@@ -251,7 +251,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined_fix',
+            'exp_id': 'combined_nosize',
             'save_valid_freq': 10000,
             'save_filters_freq': 5000,
             'cache_filters_freq': 5000,
@@ -275,7 +275,7 @@ class ImageNetYOLO():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'imagenet',
+            'exp_id': 'combined_nosize',
             'do_restore': True,
             'load_query': None,
         }

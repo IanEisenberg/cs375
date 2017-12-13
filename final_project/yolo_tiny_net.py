@@ -356,9 +356,9 @@ class YoloTinyNet(Net):
 
     #coord_loss
     coord_loss = (tf.nn.l2_loss(I * (p_x - x)/(self.image_size/self.cell_size)) +
-                 tf.nn.l2_loss(I * (p_y - y)/(self.image_size/self.cell_size)) +
-                 tf.nn.l2_loss(I * (p_sqrt_w - sqrt_w))/ self.image_size +
-                 tf.nn.l2_loss(I * (p_sqrt_h - sqrt_h))/self.image_size) * self.coord_scale
+                 tf.nn.l2_loss(I * (p_y - y)/(self.image_size/self.cell_size))) * self.coord_scale # +
+                 #tf.nn.l2_loss(I * (p_sqrt_w - sqrt_w))/ self.image_size +
+                 #tf.nn.l2_loss(I * (p_sqrt_h - sqrt_h))/self.image_size) * self.coord_scale
 
     # nilboy = I
 
