@@ -140,7 +140,7 @@ class NeuralDataExperiment():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'combined',
+            'exp_id': 'combined_val',
             'save_to_gfs': [],
         }
 
@@ -399,8 +399,25 @@ if __name__ == '__main__':
     """
     Illustrates how to run the configured model using tfutils
     """
-    base.get_params()
-    m = NeuralDataExperiment()
-    params = m.setup_params()
-    base.test_from_params(**params)
+    
+    [{}, {'exp_id': combined, 'train_results': {'loss': 3,}]
+    
+    for exp_id in ['imagenet', 'combined', 'combined_nosize']:
+        # normal setup
+        base.get_params()
+        m = NeuralDataExperiment()
+        params = m.setup_params()
+        
+        # query the connection to get training steps
+        conn = pm.MongoClient(port=params['load_params']['port'])
+        coll = conn[params['load_params']['dbname']]['yolo.files']
+        steps = [i['step'] for i in coll.find({'exp_id': exp_id, 
+                                               'train_results': {'$exists': True}}, projection=['step'])]
+        for step in steps:
+            # determine time steps
+            #print("Running Step %s" % step)
+            params['load_params']['query'] = {'step': step}
+            params['save_params']['exp_id'] = '%s_step%s' % (exp_id, step)
+            base.test_from_params(**params)
+
 
