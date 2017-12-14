@@ -4,13 +4,14 @@ import numpy as np
 import tensorflow as tf
 import tabular as tb
 import itertools
+import pymongo as pm
 
 from scipy.stats import spearmanr
 from dldata.metrics.utils import compute_metric_base
 from tfutils import base, data, model, optimizer, utils
 
 from utils import post_process_neural_regression_msplit_preprocessed
-from dataprovider import NeuralDataProvider
+from neuraldataprovider import NeuralDataProvider
 from yolo_tiny_net import YoloTinyNet
 
 
@@ -345,19 +346,19 @@ class NeuralDataExperiment():
         features, IT_feats = self.get_features(results, num_subsampled_features=1024)
 
         print('IT:')
-        #retval['rdm_it'] = self.compute_rdm(IT_feats, meta, mean_objects=True)
+        retval['rdm_it'] = self.compute_rdm(IT_feats, meta, mean_objects=True)
 
         for layer in features:
             print('Layer: %s' % layer)
             # RDM
-            #retval['rdm_%s' % layer] = self.compute_rdm(features[layer], meta, mean_objects=True)
+            retval['rdm_%s' % layer] = self.compute_rdm(features[layer], meta, mean_objects=True)
             # RDM correlation
-            #retval['spearman_corrcoef_%s' % layer] =                     spearmanr(
-            #                np.reshape(retval['rdm_%s' % layer], [-1]),
-            #                np.reshape(retval['rdm_it'], [-1])
-            #                )[0]
+            retval['spearman_corrcoef_%s' % layer] =                     spearmanr(
+                            np.reshape(retval['rdm_%s' % layer], [-1]),
+                            np.reshape(retval['rdm_it'], [-1])
+                            )[0]
             # categorization test
-            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
+            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V0','V3','V6'])
         return retval
@@ -377,19 +378,19 @@ class NeuralDataExperiment():
         features, IT_feats = self.get_features(results, num_subsampled_features=1024)
 
         print('IT:')
-        #retval['rdm_it'] = self.compute_rdmV6(IT_feats, meta, mean_objects=True)
+        retval['rdm_it'] = self.compute_rdmV6(IT_feats, meta, mean_objects=True)
 
         for layer in features:
             print('Layer: %s' % layer)
             # RDM
-            #retval['rdm_%s' % layer] = self.compute_rdmV6(features[layer], meta, mean_objects=True)
+            retval['rdm_%s' % layer] = self.compute_rdmV6(features[layer], meta, mean_objects=True)
             # RDM correlation
-            #retval['spearman_corrcoef_%s' % layer] = spearmanr(
-            #                np.reshape(retval['rdm_%s' % layer], [-1]),
-            #                np.reshape(retval['rdm_it'], [-1])
-            #                )[0]
+            retval['spearman_corrcoef_%s' % layer] = spearmanr(
+                            np.reshape(retval['rdm_%s' % layer], [-1]),
+                            np.reshape(retval['rdm_it'], [-1])
+                            )[0]
             # categorization test
-            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
+            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V6'])
                 
@@ -397,27 +398,43 @@ class NeuralDataExperiment():
 
 if __name__ == '__main__':
     """
-    Illustrates how to run the configured model using tfutils
+    For each of our three models ('imagenet', simply pre-trained on imagenet categorization, 'combined_nosize' which is then further trained on imagenet categorization and coco x-y localization, and 'combined' which learns to predict bounding boxes accurately in coco during its post-training), this runs the validation code at the training steps of interest.
     """
     
-    [{}, {'exp_id': combined, 'train_results': {'loss': 3,}]
-    
-    for exp_id in ['imagenet', 'combined', 'combined_nosize']:
+    for exp_id in ['imagenet', 'combined_2', 'combined_nosize']:
         # normal setup
         base.get_params()
         m = NeuralDataExperiment()
         params = m.setup_params()
         
-        # query the connection to get training steps
+        # query the connection to get training steps where filters were saved
         conn = pm.MongoClient(port=params['load_params']['port'])
         coll = conn[params['load_params']['dbname']]['yolo.files']
         steps = [i['step'] for i in coll.find({'exp_id': exp_id, 
-                                               'train_results': {'$exists': True}}, projection=['step'])]
-        for step in steps:
-            # determine time steps
-            #print("Running Step %s" % step)
-            params['load_params']['query'] = {'step': step}
-            params['save_params']['exp_id'] = '%s_step%s' % (exp_id, step)
+                                               'train_results': {'$exists': True},'saved_filters':True}, projection=['step'])]
+        if exp_id == 'imagenet':
+            #for imagenet-only model, we are only interested in its final training state
+            #steps = (steps[-1],)
+            params['load_params']['query'] = None
+            params['load_params']['exp_id'] = exp_id
+            params['save_params']['exp_id'] = '%s_step%s' % (exp_id, steps[-1])
+
             base.test_from_params(**params)
+        else:
+            #for other models, which are saved every 5k training steps, we want to evaluate every 30k steps 
+            #by looking at every 6th record
+            steps = steps[0::6] 
+            
+            for step in steps:
+                # evaluate the given model at each of the training steps of interest
+                # print("Running Step %s" % step)
+                params['load_params']['query'] = {'step': step}
+                params['load_params']['exp_id'] = exp_id
+                params['save_params']['exp_id'] = '%s_step%s' % (exp_id, step)
+
+                base.test_from_params(**params)
+        
+          
+        
 
 
