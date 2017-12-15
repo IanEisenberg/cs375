@@ -130,7 +130,8 @@ class NeuralDataProvider(data.TFRecordsParallelByFileProvider):
         def _postprocess_images(im):
             if self.use_mean_subtraction:
                 im = im - self.IMAGENET_MEAN
-            im = tf.image.resize_image_with_crop_or_pad(
-                    im, self.crop_size, self.crop_size)
+            im = tf.expand_dims(im, 0)
+            im = tf.image.resize_bilinear(im, [self.crop_size, self.crop_size], align_corners=True)
+            im = tf.squeeze(im, axis=[0])
             return im
         return tf.map_fn(lambda im: _postprocess_images(im), ims, dtype=tf.float32)

@@ -30,6 +30,130 @@ class YoloTinyNet(Net):
       self.class_scale = float(net_params['class_scale'])
       self.coord_scale = float(net_params['coord_scale'])
 
+  def original(self, inputs, train=True, norm=True, **kwargs):
+    # Shared portion of the ImageNet / COCO pipeline
+    outputs = inputs
+    images = inputs['images']
+    conv_num = 1
+    temp_conv = tf.layers.conv2d(images, 16, (3, 3), (1, 1),  
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool1')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 32, (3, 3), (1, 1),  
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool2')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 64, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+    
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool3')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 128, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool4')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 256, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool5')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 512, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='pool6')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1     
+
+    temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1 
+
+    temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='conv' + str(conv_num),
+        reuse=reuse)
+    outputs['conv_%s' % conv_num] = temp_conv
+    conv_num += 1 
+
+    temp_conv = tf.transpose(temp_conv, (0, 3, 1, 2))
+
+    # Fully connected layers
+    conv_flat = tf.contrib.layers.flatten(temp_conv)
+    local1 = tf.layers.dense(conv_flat, 256,
+        activation=tf.nn.relu, 
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        name='fc1',
+        reuse=reuse)
+    outputs['fc1'] = local1
+
+    local2 = tf.layers.dense(local1, 4096,
+        activation=tf.nn.relu,
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        name='fc2',
+        reuse=reuse)
+    outputs['fc2'] = local2
+
+    # Bounding box outputs for COCO image
+    local3 = tf.layers.dense(local2, self.cell_size * self.cell_size * (self.num_classes + self.boxes_per_cell * 5), name='fc3')
+    n1 = self.cell_size * self.cell_size * self.num_classes
+
+    n2 = n1 + self.cell_size * self.cell_size * self.boxes_per_cell
+
+    class_probs = tf.reshape(local3[:, 0:n1], (-1, self.cell_size, self.cell_size, self.num_classes))
+    scales = tf.reshape(local3[:, n1:n2], (-1, self.cell_size, self.cell_size, self.boxes_per_cell))
+    boxes = tf.reshape(local3[:, n2:], (-1, self.cell_size, self.cell_size, self.boxes_per_cell * 4))
+
+    local3 = tf.concat([class_probs, scales, boxes], 3)
+
+    predicts = local3
+    outputs['bboxes'] = predicts
+
+    return outputs, {}
+
   def yolo_shared(self, images, reuse=False):
     """
     Args:
