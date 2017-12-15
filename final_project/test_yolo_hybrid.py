@@ -182,7 +182,7 @@ class NeuralDataExperiment():
 
             # Generate the feature masks
             for k, v in res.items():
-                if k in self.Config.target_layers:
+                if k in self.Config.target_layers + ['large_' + layer for layer in self.Config.target_layers]:
                     num_feats = np.product(v.shape[1:])
                     mask = np.random.RandomState(0).permutation(num_feats)[:512]
                     self.feature_masks[k] = mask
@@ -194,7 +194,7 @@ class NeuralDataExperiment():
 
             v2 = res['large_' + layer]
             feats2 = np.reshape(v2, [v2.shape[0], -1])
-            feats2 = feats2[:, self.feature_masks[layer]]
+            feats2 = feats2[:, self.feature_masks['large_' + layer]]
             agg_res[layer].append(np.concatenate([feats, feats2], axis=1))
 
         for k, v in res.items():
@@ -350,7 +350,7 @@ class NeuralDataExperiment():
                             np.reshape(retval['rdm_it'], [-1])
                             )[0]
             # categorization test
-            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
+            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V0','V3','V6'])
         return retval
@@ -382,7 +382,7 @@ class NeuralDataExperiment():
                             np.reshape(retval['rdm_it'], [-1])
                             )[0]
             # categorization test
-            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
+            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V6'])
                 
@@ -408,6 +408,6 @@ if __name__ == '__main__':
             #steps = (steps[-1],)
             params['load_params']['query'] = None
             params['load_params']['exp_id'] = exp_id
-            params['save_params']['exp_id'] = '%s_step%s' % (exp_id, steps[-1])
+            params['save_params']['exp_id'] = 'hybrid' 
 
             base.test_from_params(**params)
