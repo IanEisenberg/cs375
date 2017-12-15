@@ -56,7 +56,7 @@ class COCO(data.TFRecordsParallelByFileProvider):
                     'segmentation_masks', 'width', 'bboxes']
 
         # key_list = ['images']
-        source_dirs = ['/datasets/mscoco2/train_tfrecords/{}/' .format(v) for v in key_list]
+        source_dirs = ['/datasets/mscoco2/{}_tfrecords/{}/' .format(self.group, v) for v in key_list]
         
         BYTES_KEYs = {'images', 'labels', 'segmentation_masks', 'bboxes'}
 

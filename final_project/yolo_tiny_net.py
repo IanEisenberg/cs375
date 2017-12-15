@@ -2,9 +2,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.python.pywrap_tensorflow import NewCheckpointReader
 import tensorflow as tf
 import numpy as np
 import re
+import cPickle
 
 from net import Net 
 
@@ -24,19 +26,166 @@ class YoloTinyNet(Net):
     self.batch_size = int(common_params['batch_size'])
     self.weight_decay = float(net_params['weight_decay'])
 
+    with open('checkpoint/weights.pckl', 'rb') as input_file:
+        self.weights = cPickle.load(input_file)
+        for weight in self.weights.keys():
+            self.weights[weight] = tf.constant_initializer(self.weights[weight])
+
     if not test:
       self.object_scale = float(net_params['object_scale'])
       self.noobject_scale = float(net_params['noobject_scale'])
       self.class_scale = float(net_params['class_scale'])
       self.coord_scale = float(net_params['coord_scale'])
 
+  def hybrid(self, inputs, train=True, norm=True, **kwargs):
+    reuse = False
+    outputs = inputs
+
+    base_input = inputs['images']
+    base_input.set_shape([self.batch_size, self.image_size, self.image_size, 3])
+    imagenet_output = self.yolo_shared(base_input)
+
+    for key in imagenet_output:
+      outputs[key] = imagenet_output[key]
+
+    large_input = tf.image.resize_bilinear(base_input, [448, 448], align_corners=True) 
+    conv_num = 1
+    temp_conv = tf.layers.conv2d(large_input, 16, (3, 3), (1, 1),  
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool1')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 32, (3, 3), (1, 1),  
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool2')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 64, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+    
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool3')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 128, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool4')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 256, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool5')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 512, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1
+
+    temp_pool = tf.layers.max_pooling2d(temp_conv, [2, 2], [2, 2], padding='SAME', name='large_pool6')
+
+    temp_conv = tf.layers.conv2d(temp_pool, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1     
+
+    temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1 
+
+    temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        padding='SAME', name='large_conv' + str(conv_num),
+        reuse=reuse)
+    outputs['large_conv_%s' % conv_num] = temp_conv
+    conv_num += 1 
+
+    temp_conv = tf.transpose(temp_conv, (0, 3, 1, 2))
+
+    # Fully connected layers
+    conv_flat = tf.contrib.layers.flatten(temp_conv)
+    local1 = tf.layers.dense(conv_flat, 256,
+        activation=tf.nn.relu, 
+        kernel_initializer=self.weights['fc1/kernel'],
+        bias_initializer=self.weights['fc1/bias'],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        name='large_fc1',
+        reuse=reuse)
+    outputs['large_fc1'] = local1
+
+    local2 = tf.layers.dense(local1, 4096,
+        activation=tf.nn.relu,
+        kernel_initializer=self.weights['fc2/kernel'],
+        bias_initializer=self.weights['fc2/bias'],
+        kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
+        name='large_fc2',
+        reuse=reuse)
+    outputs['large_fc2'] = local2
+    return outputs, {}
+
   def original(self, inputs, train=True, norm=True, **kwargs):
+    reuse=False
     # Shared portion of the ImageNet / COCO pipeline
     outputs = inputs
     images = inputs['images']
+    images.set_shape([self.batch_size, self.image_size, self.image_size, 3])
     conv_num = 1
     temp_conv = tf.layers.conv2d(images, 16, (3, 3), (1, 1),  
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -47,6 +196,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 32, (3, 3), (1, 1),  
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -57,6 +208,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 64, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -67,6 +220,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 128, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -77,6 +232,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 256, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -87,6 +244,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 512, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -97,6 +256,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_pool, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -105,6 +266,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -113,6 +276,8 @@ class YoloTinyNet(Net):
 
     temp_conv = tf.layers.conv2d(temp_conv, 1024, (3, 3), (1, 1), 
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['conv%s/kernel' % conv_num],
+        bias_initializer=self.weights['conv%s/bias' % conv_num],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         padding='SAME', name='conv' + str(conv_num),
         reuse=reuse)
@@ -125,6 +290,8 @@ class YoloTinyNet(Net):
     conv_flat = tf.contrib.layers.flatten(temp_conv)
     local1 = tf.layers.dense(conv_flat, 256,
         activation=tf.nn.relu, 
+        kernel_initializer=self.weights['fc1/kernel'],
+        bias_initializer=self.weights['fc1/bias'],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         name='fc1',
         reuse=reuse)
@@ -132,13 +299,19 @@ class YoloTinyNet(Net):
 
     local2 = tf.layers.dense(local1, 4096,
         activation=tf.nn.relu,
+        kernel_initializer=self.weights['fc2/kernel'],
+        bias_initializer=self.weights['fc2/bias'],
         kernel_regularizer=tf.contrib.layers.l2_regularizer(self.weight_decay), 
         name='fc2',
         reuse=reuse)
     outputs['fc2'] = local2
 
     # Bounding box outputs for COCO image
-    local3 = tf.layers.dense(local2, self.cell_size * self.cell_size * (self.num_classes + self.boxes_per_cell * 5), name='fc3')
+    local3 = tf.layers.dense(local2, self.cell_size * self.cell_size * (self.num_classes + self.boxes_per_cell * 5),
+        kernel_initializer=self.weights['fc3/kernel'],
+        bias_initializer=self.weights['fc3/bias'],
+        name='fc3')
+
     n1 = self.cell_size * self.cell_size * self.num_classes
 
     n2 = n1 + self.cell_size * self.cell_size * self.boxes_per_cell

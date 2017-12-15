@@ -52,8 +52,8 @@ class ImageNetDataProvider(data.TFRecordsParallelByFileProvider):
             ims = tf.map_fn(lambda img: tf.image.convert_image_dtype(
                 img, dtype=dtype), ims, dtype=dtype)
             ims = ims - self.IMAGENET_MEAN
-            ims = tf.map_fn(lambda img: tf.random_crop(
-                img, shape), ims)
+            ims = tf.map_fn(lambda img: tf.image.resize_image_with_crop_or_pad(
+                img, shape[0], shape[1]), ims)
             ims = tf.map_fn(lambda img: tf.image.random_flip_left_right(
                 img), ims)
 

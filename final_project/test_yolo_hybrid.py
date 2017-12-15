@@ -31,7 +31,7 @@ class NeuralDataExperiment():
         data_path = '/datasets/neural_data/tfrecords_with_meta'
         noise_estimates_path = '/datasets/neural_data/noise_estimates.npy'
         seed = 5
-        crop_size = 448
+        crop_size = 224
         thres_loss = 1000
         n_epochs = 90
         common_params = {
@@ -50,7 +50,7 @@ class NeuralDataExperiment():
         }
         #feature_masks = {}
         extraction_step = None
-        extraction_targets = [attr[0] for attr in NeuralDataProvider.ATTRIBUTES] + target_layers
+        extraction_targets = [attr[0] for attr in NeuralDataProvider.ATTRIBUTES] + target_layers + ['large_' + layer for layer in target_layers]
         ytn = YoloTinyNet(common_params,net_params,test=True)
         assert NeuralDataProvider.N_VAL % batch_size == 0, \
                 ('number of examples not divisible by batch size!')
@@ -130,7 +130,7 @@ class NeuralDataExperiment():
         model_params defines the model to be tested - in our case, YoloTinyNet
         """
         params['model_params'] = {
-            'func': self.Config.ytn.original,
+            'func': self.Config.ytn.hybrid,
         }
 
         """
@@ -141,7 +141,7 @@ class NeuralDataExperiment():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'yolo_hack',
+            'exp_id': 'yolo_hybrid',
             'save_to_gfs': [],
         }
 
@@ -153,7 +153,7 @@ class NeuralDataExperiment():
             'port': 24444,
             'dbname': 'final',
             'collname': 'yolo',
-            'exp_id': 'yolo_hack',
+            'exp_id': 'yolo_hybrid',
             'do_restore': True,
             'load_query': None,
             'query': None 
@@ -184,16 +184,24 @@ class NeuralDataExperiment():
             for k, v in res.items():
                 if k in self.Config.target_layers:
                     num_feats = np.product(v.shape[1:])
-                    mask = np.random.RandomState(0).permutation(num_feats)[:1024]
+                    mask = np.random.RandomState(0).permutation(num_feats)[:512]
                     self.feature_masks[k] = mask
+
+        for layer in self.Config.target_layers:
+            v = res[layer]
+            feats = np.reshape(v, [v.shape[0], -1])
+            feats = feats[:, self.feature_masks[layer]]
+
+            v2 = res['large_' + layer]
+            feats2 = np.reshape(v2, [v2.shape[0], -1])
+            feats2 = feats2[:, self.feature_masks[layer]]
+            agg_res[layer].append(np.concatenate([feats, feats2], axis=1))
 
         for k, v in res.items():
             if 'kernel' in k:
                 agg_res[k] = v
-            elif k in self.Config.target_layers:
-                feats = np.reshape(v, [v.shape[0], -1])
-                feats = feats[:, self.feature_masks[k]]
-                agg_res[k].append(feats)
+            elif k in self.Config.target_layers + ['large_' + layer for layer in self.Config.target_layers]:
+                pass
             else:
                 agg_res[k].append(v)
         return agg_res
@@ -342,7 +350,7 @@ class NeuralDataExperiment():
                             np.reshape(retval['rdm_it'], [-1])
                             )[0]
             # categorization test
-            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
+            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V0','V3','V6'])
         return retval
@@ -374,7 +382,7 @@ class NeuralDataExperiment():
                             np.reshape(retval['rdm_it'], [-1])
                             )[0]
             # categorization test
-            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
+            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
             # IT regression test
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V6'])
                 
@@ -384,22 +392,22 @@ if __name__ == '__main__':
     """
     For each of our three models ('imagenet', simply pre-trained on imagenet categorization, 'combined_nosize' which is then further trained on imagenet categorization and coco x-y localization, and 'combined' which learns to predict bounding boxes accurately in coco during its post-training), this runs the validation code at the training steps of interest.
     """
-    
-    for exp_id in ['yolo_hack']:
+    for exp_id in ['imagenet']:
         # normal setup
         base.get_params()
         m = NeuralDataExperiment()
         params = m.setup_params()
         
-        # evaluate the given model at each of the training steps of interest
-        # print("Running Step %s" % step)
-        params['load_params']['query'] = None
-        params['load_params']['exp_id'] = exp_id
-        params['save_params']['exp_id'] = exp_id
+        # query the connection to get training steps where filters were saved
+        conn = pm.MongoClient(port=params['load_params']['port'])
+        coll = conn[params['load_params']['dbname']]['yolo.files']
+        steps = [i['step'] for i in coll.find({'exp_id': exp_id, 
+                                               'train_results': {'$exists': True},'saved_filters':True}, projection=['step'])]
+        if exp_id == 'imagenet':
+            #for imagenet-only model, we are only interested in its final training state
+            #steps = (steps[-1],)
+            params['load_params']['query'] = None
+            params['load_params']['exp_id'] = exp_id
+            params['save_params']['exp_id'] = '%s_step%s' % (exp_id, steps[-1])
 
-        base.test_from_params(**params)
-    
-      
-    
-
-
+            base.test_from_params(**params)
