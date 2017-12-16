@@ -184,7 +184,7 @@ class NeuralDataExperiment():
             for k, v in res.items():
                 if k in self.Config.target_layers + ['large_' + layer for layer in self.Config.target_layers]:
                     num_feats = np.product(v.shape[1:])
-                    mask = np.random.RandomState(0).permutation(num_feats)[:512]
+                    mask = np.random.RandomState(0).permutation(num_feats)[:1024]
                     self.feature_masks[k] = mask
 
         for layer in self.Config.target_layers:
@@ -318,6 +318,8 @@ class NeuralDataExperiment():
             feats = np.reshape(feats, [feats.shape[0], -1])
             if num_subsampled_features is not None:
                 features[layer] = feats[:, np.random.RandomState(0).permutation(feats.shape[1])[:num_subsampled_features]]
+            else:
+                features[layer] = feats
 
         IT_feats = np.concatenate(results['it_feats'], axis=0)
 
@@ -335,23 +337,24 @@ class NeuralDataExperiment():
         retval = {}
         print('Performing neural analysis...')
         meta = self.parse_meta_data(results)
-        features, IT_feats = self.get_features(results, num_subsampled_features=1024)
+        features, IT_feats = self.get_features(results, num_subsampled_features=None)
 
-        print('IT:')
-        retval['rdm_it'] = self.compute_rdm(IT_feats, meta, mean_objects=True)
+        #print('IT:')
+        #retval['rdm_it'] = self.compute_rdm(IT_feats, meta, mean_objects=True)
 
         for layer in features:
             print('Layer: %s' % layer)
             # RDM
-            retval['rdm_%s' % layer] = self.compute_rdm(features[layer], meta, mean_objects=True)
+            #retval['rdm_%s' % layer] = self.compute_rdm(features[layer], meta, mean_objects=True)
             # RDM correlation
-            retval['spearman_corrcoef_%s' % layer] =                     spearmanr(
-                            np.reshape(retval['rdm_%s' % layer], [-1]),
-                            np.reshape(retval['rdm_it'], [-1])
-                            )[0]
+            #retval['spearman_corrcoef_%s' % layer] =                     spearmanr(
+            #                np.reshape(retval['rdm_%s' % layer], [-1]),
+            #                np.reshape(retval['rdm_it'], [-1])
+            #                )[0]
             # categorization test
-            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
+            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V0','V3','V6'])
             # IT regression test
+            print("IT regression")
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V0','V3','V6'])
         return retval
     
@@ -367,7 +370,7 @@ class NeuralDataExperiment():
         retval = {}
         print('Performing neural analysis...')
         meta = self.parse_meta_data(results)
-        features, IT_feats = self.get_features(results, num_subsampled_features=1024)
+        features, IT_feats = self.get_features(results, num_subsampled_features=None)
 
         print('IT:')
         retval['rdm_it'] = self.compute_rdmV6(IT_feats, meta, mean_objects=True)
@@ -375,15 +378,16 @@ class NeuralDataExperiment():
         for layer in features:
             print('Layer: %s' % layer)
             # RDM
-            retval['rdm_%s' % layer] = self.compute_rdmV6(features[layer], meta, mean_objects=True)
+            #retval['rdm_%s' % layer] = self.compute_rdmV6(features[layer], meta, mean_objects=True)
             # RDM correlation
-            retval['spearman_corrcoef_%s' % layer] = spearmanr(
-                            np.reshape(retval['rdm_%s' % layer], [-1]),
-                            np.reshape(retval['rdm_it'], [-1])
-                            )[0]
+            #retval['spearman_corrcoef_%s' % layer] = spearmanr(
+            #                np.reshape(retval['rdm_%s' % layer], [-1]),
+            #                np.reshape(retval['rdm_it'], [-1])
+            #                )[0]
             # categorization test
-            retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
+            #retval['categorization_%s' % layer] = self.categorization_test(features[layer], meta, ['V6'])
             # IT regression test
+            print("IT regression")
             retval['it_regression_%s' % layer] = self.regression_test(features[layer], IT_feats, meta, ['V6'])
                 
         return retval
